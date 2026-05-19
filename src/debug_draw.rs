@@ -8,7 +8,12 @@ impl Draw for DebugDrawer {
     }
 
     fn draw_buffer(&self, screen_buf: &[u8]) {
-        dbg!(format!("Call to draw_buffer: {:?}", screen_buf));
+        let x = screen_buf
+            .chunks(64)
+            .map(|s| format!("{:?}", s))
+            .collect::<Vec<String>>()
+            .join("\n");
+        println!("Call to draw_buffer:\n{}", x);
     }
 
     fn return_home(&self) {
