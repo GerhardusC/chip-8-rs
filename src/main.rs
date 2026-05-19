@@ -1,4 +1,6 @@
-use std::{error::Error, fmt::Display, sync::atomic::AtomicU16};
+use std::{error::Error, sync::atomic::AtomicU16, time::Duration};
+
+use chip_eight::{ApplicationError, DebugDrawer, Draw, Drawer, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 const FONT: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -19,16 +21,20 @@ const FONT: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
-struct Emulator {
+struct Emulator<T: Draw> {
     memory: [u8; 0x1000],
+    #[allow(unused)]
     stack: Vec<usize>,
     variable_registers: [u8; 16],
-    screen_buffer: [u8; 8 * 32],
+    screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
     font_addr: usize,
     index_register: usize,
     program_counter: usize,
+    #[allow(unused)]
     delay_timer: AtomicU16,
+    #[allow(unused)]
     sound_timer: AtomicU16,
+    drawer: T,
 }
 
 #[derive(Debug)]
@@ -55,7 +61,9 @@ enum Instruction {
         y_register: usize,
         height: u8,
     },
+    #[allow(unused)]
     Unimplemented(u16),
+    #[allow(unused)]
     Error(u16),
 }
 
@@ -102,18 +110,20 @@ impl From<u16> for Instruction {
     }
 }
 
-impl Emulator {
+impl<T: Draw> Emulator<T> {
+    // TODO: take in the program memory as argument and copy it into memory in the constructor.
     fn init() -> Result<Self, ApplicationError> {
         let mut emulator = Self {
             memory: [0; 0x1000],
             stack: vec![],
-            variable_registers: [0; 16],
-            screen_buffer: [0; 8 * 32],
+            variable_registers: [0; 0x10],
+            screen_buffer: [0; SCREEN_WIDTH * SCREEN_HEIGHT],
             font_addr: 0x50,
             index_register: 0,
             program_counter: 0x200,
             delay_timer: AtomicU16::new(0),
             sound_timer: AtomicU16::new(0),
+            drawer: T::init(),
         };
 
         emulator.set_font(&FONT)?;
@@ -122,7 +132,7 @@ impl Emulator {
     }
 
     fn set_font(&mut self, font: &[u8]) -> Result<(), ApplicationError> {
-        Ok(self.set_mem_block(font, self.font_addr)?)
+        self.set_mem_block(font, self.font_addr)
     }
 
     fn fetch(&mut self) -> Instruction {
@@ -134,16 +144,49 @@ impl Emulator {
 
     fn execute(&mut self, instruction: Instruction) {
         match instruction {
-            Instruction::ClearScreen => {}
+            Instruction::ClearScreen => {
+                self.drawer.clear_screen();
+            }
             Instruction::Draw {
                 x_register,
                 y_register,
                 height,
-            } => {}
+            } => {
+                self.variable_registers[0xF] = 0;
+                let x_value = self.variable_registers[x_register] as u16;
+                let y_value = self.variable_registers[y_register] as u16;
+                let start_loc = y_value * SCREEN_WIDTH as u16 + x_value;
+
+                // For each row in the sprite
+                for i in 0..height {
+                    let sprite = self.memory[self.index_register + i as usize];
+
+                    let current_loc = start_loc + SCREEN_WIDTH as u16 * i as u16;
+
+                    // For each pixel in the row
+                    for j in 0..8 {
+                        let mask: u8 = 0b10000000 >> j;
+                        if let Some(x) = self.screen_buffer.get_mut(current_loc as usize + j) {
+                            let ans = mask & sprite;
+                            let tmp = if ans > 0 { 1 } else { 0 };
+                            if tmp == 1 && *x == tmp {
+                                self.variable_registers[0xF] = 1;
+                            } else {
+                                *x = tmp;
+                            }
+                        }
+                    }
+                }
+                self.drawer.draw_buffer(&self.screen_buffer);
+            }
             Instruction::Jump(address) => self.program_counter = address as usize,
             Instruction::SetIndexRegister(address) => self.index_register = address as usize,
-            Instruction::SetGeneralRegister { register, value } => {}
-            Instruction::AddToRegister { register, value } => {}
+            Instruction::SetGeneralRegister { register, value } => {
+                self.variable_registers[register] = value
+            }
+            Instruction::AddToRegister { register, value } => {
+                self.variable_registers[register] += value
+            }
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
         }
@@ -163,38 +206,46 @@ impl Emulator {
         Ok(())
     }
 
-    fn run(mut self) {
-        let delay_timer = &self.delay_timer;
-        let sound_timer = &self.sound_timer;
-        std::thread::scope(|s| {});
+    fn _run(self) {
+        let _delay_timer = &self.delay_timer;
+        let _sound_timer = &self.sound_timer;
+        std::thread::scope(|_s| {});
     }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut emulator = Emulator::init()?;
-    let instruction = emulator.fetch();
+    let mut args = std::env::args();
+    args.next();
+    let mode = args.next();
+    let input = std::fs::read("./test_logo_program").expect("test program should exist");
 
-    Ok(())
-}
-
-#[derive(Debug)]
-enum ApplicationError {
-    MemoryLocationOutOfRange { max_addr: usize },
-}
-
-impl Error for ApplicationError {}
-
-impl Display for ApplicationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ApplicationError::MemoryLocationOutOfRange { max_addr } => {
-                write!(
-                    f,
-                    "Tried to write memory out of range, max address: {max_addr}"
-                )
+    match mode.as_ref() {
+        Some(x) if x == "--dbg" || x == "-d" => {
+            let mut emulator = Emulator::<DebugDrawer>::init()?;
+            emulator.set_mem_block(&input, 0x200)?;
+            loop {
+                let instruction = emulator.fetch();
+                emulator.execute(instruction);
+                println!("Next instruction: 'n'");
+                let mut res = String::new();
+                std::io::stdin().read_line(&mut res)?;
+                if res.trim() == "n" {
+                    continue;
+                } else {
+                    return Ok(());
+                }
             }
         }
-    }
+        _ => {
+            let mut emulator = Emulator::<Drawer>::init()?;
+            emulator.set_mem_block(&input, 0x200)?;
+            loop {
+                let instruction = emulator.fetch();
+                emulator.execute(instruction);
+                std::thread::sleep(Duration::from_millis(100 / 6));
+            }
+        }
+    };
 }
 
 #[cfg(test)]
@@ -203,7 +254,7 @@ mod tests {
 
     #[test]
     fn it_can_fetch_an_instruction() {
-        let mut emulator = Emulator::init().expect("All initial memory is in range");
+        let mut emulator = Emulator::<Drawer>::init().expect("All initial memory is in range");
 
         emulator
             .set_font(&FONT)
