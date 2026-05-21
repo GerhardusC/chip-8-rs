@@ -63,7 +63,11 @@ enum Instruction {
         y_register: usize,
         height: u8,
     },
-    CompareValueWithRegisterContents {
+    SkipEqValueWithRegisterContents {
+        register: usize,
+        value: u8,
+    },
+    SkipNotEqValueWithRegisterContents {
         register: usize,
         value: u8,
     },
@@ -81,11 +85,14 @@ impl From<u16> for Instruction {
             // 1NNN (jump)
             0x1 => Self::Jump(0x0FFF & value),
             0x2 => Self::Unimplemented(value),
-            0x3 => Self::CompareValueWithRegisterContents {
+            0x3 => Self::SkipEqValueWithRegisterContents {
                 register: (value & 0x0F00) as usize >> 8,
                 value: (value & 0x00FF) as u8,
             },
-            0x4 => Self::Unimplemented(value),
+            0x4 => Self::SkipNotEqValueWithRegisterContents {
+                register: (value & 0x0F00) as usize >> 8,
+                value: (value & 0x00FF) as u8,
+            },
             0x5 => Self::Unimplemented(value),
             // 6XNN (set register VX)
             0x6 => Self::SetGeneralRegister {
@@ -197,9 +204,15 @@ impl<T: Draw> Emulator<T> {
             Instruction::AddToRegister { register, value } => {
                 self.variable_registers[register] += value
             }
-            Instruction::CompareValueWithRegisterContents { register, value } => {
+            Instruction::SkipEqValueWithRegisterContents { register, value } => {
                 let vx_value = self.variable_registers[register];
                 if vx_value == value {
+                    self.program_counter += 2;
+                }
+            }
+            Instruction::SkipNotEqValueWithRegisterContents { register, value } => {
+                let vx_value = self.variable_registers[register];
+                if vx_value != value {
                     self.program_counter += 2;
                 }
             }
@@ -393,6 +406,10 @@ mod tests {
         emulator.memory[0x20C] = 0x31;
         emulator.memory[0x20D] = 0x23;
 
+        // 4XNN (skip if *reg X not eq val NN)
+        emulator.memory[0x20E] = 0x41;
+        emulator.memory[0x20F] = 0x23;
+
         emulator.program_counter = 0x200;
 
         let instruction = emulator.fetch();
@@ -435,7 +452,16 @@ mod tests {
         let instruction = emulator.fetch();
         assert!(matches!(
             instruction,
-            Instruction::CompareValueWithRegisterContents {
+            Instruction::SkipEqValueWithRegisterContents {
+                register: 0x1,
+                value: 0x23
+            }
+        ));
+
+        let instruction = emulator.fetch();
+        assert!(matches!(
+            instruction,
+            Instruction::SkipNotEqValueWithRegisterContents {
                 register: 0x1,
                 value: 0x23
             }
