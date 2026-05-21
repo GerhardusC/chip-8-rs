@@ -71,6 +71,14 @@ enum Instruction {
         register: usize,
         value: u8,
     },
+    SkipEqRegisters {
+        register_x: usize,
+        register_y: usize,
+    },
+    SkipNotEqRegisters {
+        register_x: usize,
+        register_y: usize,
+    },
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]
@@ -93,7 +101,10 @@ impl From<u16> for Instruction {
                 register: (value & 0x0F00) as usize >> 8,
                 value: (value & 0x00FF) as u8,
             },
-            0x5 => Self::Unimplemented(value),
+            0x5 => Self::SkipEqRegisters {
+                register_x: (value & 0x0F00) as usize >> 8,
+                register_y: (value & 0x00F0) as usize >> 4,
+            },
             // 6XNN (set register VX)
             0x6 => Self::SetGeneralRegister {
                 register: (0xF00 & value) as usize >> 8,
@@ -105,7 +116,10 @@ impl From<u16> for Instruction {
                 value: (0xFF & value) as u8,
             },
             0x8 => Self::Unimplemented(value),
-            0x9 => Self::Unimplemented(value),
+            0x9 => Self::SkipNotEqRegisters {
+                register_x: (value & 0x0F00) as usize >> 8,
+                register_y: (value & 0x00F0) as usize >> 4,
+            },
             // ANNN (set index register I)
             0xA => Self::SetIndexRegister(0xFFF & value),
             0xB => Self::Unimplemented(value),
@@ -213,6 +227,26 @@ impl<T: Draw> Emulator<T> {
             Instruction::SkipNotEqValueWithRegisterContents { register, value } => {
                 let vx_value = self.variable_registers[register];
                 if vx_value != value {
+                    self.program_counter += 2;
+                }
+            }
+            Instruction::SkipEqRegisters {
+                register_x,
+                register_y,
+            } => {
+                let vx_value = self.variable_registers[register_x];
+                let vy_value = self.variable_registers[register_y];
+                if vx_value == vy_value {
+                    self.program_counter += 2;
+                }
+            }
+            Instruction::SkipNotEqRegisters {
+                register_x,
+                register_y,
+            } => {
+                let vx_value = self.variable_registers[register_x];
+                let vy_value = self.variable_registers[register_y];
+                if vx_value != vy_value {
                     self.program_counter += 2;
                 }
             }
@@ -410,6 +444,14 @@ mod tests {
         emulator.memory[0x20E] = 0x41;
         emulator.memory[0x20F] = 0x23;
 
+        // 5XY0 (skip if *reg X not eq *reg Y)
+        emulator.memory[0x210] = 0x51;
+        emulator.memory[0x211] = 0x20;
+
+        // 9XY0 (skip if *reg X not eq *reg Y)
+        emulator.memory[0x212] = 0x91;
+        emulator.memory[0x213] = 0x20;
+
         emulator.program_counter = 0x200;
 
         let instruction = emulator.fetch();
@@ -464,6 +506,24 @@ mod tests {
             Instruction::SkipNotEqValueWithRegisterContents {
                 register: 0x1,
                 value: 0x23
+            }
+        ));
+
+        let instruction = emulator.fetch();
+        assert!(matches!(
+            instruction,
+            Instruction::SkipEqRegisters {
+                register_x: 0x1,
+                register_y: 0x2
+            }
+        ));
+
+        let instruction = emulator.fetch();
+        assert!(matches!(
+            instruction,
+            Instruction::SkipNotEqRegisters {
+                register_x: 0x1,
+                register_y: 0x2
             }
         ));
     }
