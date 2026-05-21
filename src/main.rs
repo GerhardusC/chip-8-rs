@@ -63,6 +63,10 @@ enum Instruction {
         y_register: usize,
         height: u8,
     },
+    CompareValueWithRegisterContents {
+        register: usize,
+        value: u8,
+    },
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]
@@ -77,7 +81,10 @@ impl From<u16> for Instruction {
             // 1NNN (jump)
             0x1 => Self::Jump(0x0FFF & value),
             0x2 => Self::Unimplemented(value),
-            0x3 => Self::Unimplemented(value),
+            0x3 => Self::CompareValueWithRegisterContents {
+                register: (value & 0x0F00) as usize >> 8,
+                value: (value & 0x00FF) as u8,
+            },
             0x4 => Self::Unimplemented(value),
             0x5 => Self::Unimplemented(value),
             // 6XNN (set register VX)
@@ -189,6 +196,12 @@ impl<T: Draw> Emulator<T> {
             }
             Instruction::AddToRegister { register, value } => {
                 self.variable_registers[register] += value
+            }
+            Instruction::CompareValueWithRegisterContents { register, value } => {
+                let vx_value = self.variable_registers[register];
+                if vx_value == value {
+                    self.program_counter += 2;
+                }
             }
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
@@ -376,38 +389,56 @@ mod tests {
         emulator.memory[0x20A] = 0x11;
         emulator.memory[0x20B] = 0x23;
 
+        // 3XNN (skip if *reg X eq val NN)
+        emulator.memory[0x20C] = 0x31;
+        emulator.memory[0x20D] = 0x23;
+
         emulator.program_counter = 0x200;
 
         let instruction = emulator.fetch();
-        let instruction2 = emulator.fetch();
-        let instruction3 = emulator.fetch();
-        let instruction4 = emulator.fetch();
-        let instruction5 = emulator.fetch();
-        let instruction6 = emulator.fetch();
         assert!(matches!(instruction, Instruction::ClearScreen));
+
+        let instruction = emulator.fetch();
         assert!(matches!(
-            instruction2,
+            instruction,
             Instruction::Draw {
                 x_register: 0xE,
                 y_register: 0xF,
                 height: 0x5
             }
         ));
+
+        let instruction = emulator.fetch();
         assert!(matches!(
-            instruction3,
+            instruction,
             Instruction::SetGeneralRegister {
                 register: 0xE,
                 value: 0xAB
             }
         ));
+
+        let instruction = emulator.fetch();
         assert!(matches!(
-            instruction4,
+            instruction,
             Instruction::AddToRegister {
                 register: 0xE,
                 value: 0xAB
             }
         ));
-        assert!(matches!(instruction5, Instruction::SetIndexRegister(0x123)));
-        assert!(matches!(instruction6, Instruction::Jump(0x123)));
+
+        let instruction = emulator.fetch();
+        assert!(matches!(instruction, Instruction::SetIndexRegister(0x123)));
+
+        let instruction = emulator.fetch();
+        assert!(matches!(instruction, Instruction::Jump(0x123)));
+
+        let instruction = emulator.fetch();
+        assert!(matches!(
+            instruction,
+            Instruction::CompareValueWithRegisterContents {
+                register: 0x1,
+                value: 0x23
+            }
+        ));
     }
 }
