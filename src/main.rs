@@ -23,6 +23,7 @@ const FONT: [u8; 80] = [
 
 struct Emulator<T: Draw> {
     memory: [u8; 0x1000],
+    // TODO: Check if stack pointer needs to exist
     #[allow(unused)]
     stack: Vec<usize>,
     variable_registers: [u8; 16],
@@ -35,6 +36,7 @@ struct Emulator<T: Draw> {
     #[allow(unused)]
     sound_timer: AtomicU16,
     drawer: T,
+    running_mode: RunningMode,
 }
 
 #[derive(Debug)]
@@ -111,8 +113,7 @@ impl From<u16> for Instruction {
 }
 
 impl<T: Draw> Emulator<T> {
-    // TODO: take in the program memory as argument and copy it into memory in the constructor.
-    fn init() -> Result<Self, ApplicationError> {
+    fn init(program: Vec<u8>, running_mode: RunningMode) -> Result<Self, ApplicationError> {
         let mut emulator = Self {
             memory: [0; 0x1000],
             stack: vec![],
@@ -124,8 +125,10 @@ impl<T: Draw> Emulator<T> {
             delay_timer: AtomicU16::new(0),
             sound_timer: AtomicU16::new(0),
             drawer: T::init(),
+            running_mode,
         };
 
+        emulator.set_mem_block(&program, 0x200)?;
         emulator.set_font(&FONT)?;
 
         Ok(emulator)
@@ -206,46 +209,134 @@ impl<T: Draw> Emulator<T> {
         Ok(())
     }
 
-    fn _run(self) {
+    fn run(mut self) {
         let _delay_timer = &self.delay_timer;
         let _sound_timer = &self.sound_timer;
-        std::thread::scope(|_s| {});
+        std::thread::scope(|_s| {
+            match self.running_mode {
+                RunningMode::Debug => {
+                    let mut prev_index_register = self.index_register;
+                    let mut prev_program_counter = self.program_counter;
+                    let mut prev_stack = format!("{:?}", self.stack);
+                    let mut prev_memory = format!("{:?}", self.memory);
+                    let mut prev_varaible_registers = format!("{:?}", self.variable_registers);
+                    let mut prev_screen_buffer = format!("{:?}", self.screen_buffer);
+
+                    loop {
+                        let instruction = self.fetch();
+                        dbg!(&instruction);
+                        self.execute(instruction);
+
+                        // Always just show the stack, its small enough
+
+                        // CMP with prev state and update prev state
+                        let index_register = self.index_register;
+                        if prev_index_register != index_register {
+                            dbg!(&index_register);
+                            prev_index_register = index_register;
+                        }
+                        let program_counter = self.program_counter;
+                        if prev_program_counter != program_counter {
+                            dbg!(&program_counter);
+                            prev_program_counter = program_counter;
+                        }
+                        let stack = format!("{:?}", &self.stack);
+                        if prev_stack != stack {
+                            dbg!(&stack);
+                            prev_stack = stack;
+                        }
+                        let memory = format!("{:?}", self.memory);
+                        if prev_memory != memory {
+                            dbg!("Memory updated");
+                            prev_memory = memory;
+                        }
+                        let varaible_registers = format!("{:?}", self.variable_registers);
+                        if prev_varaible_registers != varaible_registers {
+                            dbg!(&varaible_registers);
+                            prev_varaible_registers = varaible_registers;
+                        }
+                        let screen_buffer = format!("{:?}", self.screen_buffer);
+                        if prev_screen_buffer != screen_buffer {
+                            dbg!("Screen_updated");
+                            prev_screen_buffer = screen_buffer;
+                        }
+
+                        println!("Next instruction: 'n'");
+                        let mut res = String::new();
+                        let Ok(_) = std::io::stdin().read_line(&mut res) else {
+                            break;
+                        };
+                        if res.trim() == "n" {
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                RunningMode::Normal => loop {
+                    let instruction = self.fetch();
+                    self.execute(instruction);
+                    std::thread::sleep(Duration::from_millis(100 / 6));
+                },
+            };
+        });
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let mut args = std::env::args();
-    args.next();
-    let mode = args.next();
-    let input = std::fs::read("./test_logo_program").expect("test program should exist");
+enum RunningMode {
+    Debug,
+    Normal,
+}
 
-    match mode.as_ref() {
-        Some(x) if x == "--dbg" || x == "-d" => {
-            let mut emulator = Emulator::<DebugDrawer>::init()?;
-            emulator.set_mem_block(&input, 0x200)?;
-            loop {
-                let instruction = emulator.fetch();
-                emulator.execute(instruction);
-                println!("Next instruction: 'n'");
-                let mut res = String::new();
-                std::io::stdin().read_line(&mut res)?;
-                if res.trim() == "n" {
-                    continue;
-                } else {
-                    return Ok(());
-                }
-            }
+fn main() -> Result<(), Box<dyn Error>> {
+    let args = std::env::args();
+    let num_args = args.len();
+
+    let mut running_mode = RunningMode::Normal;
+    let mut program_name = None;
+
+    for (i, arg) in args.enumerate() {
+        if arg == "--dbg" || arg == "-d" {
+            running_mode = RunningMode::Debug;
         }
-        _ => {
-            let mut emulator = Emulator::<Drawer>::init()?;
-            emulator.set_mem_block(&input, 0x200)?;
-            loop {
-                let instruction = emulator.fetch();
-                emulator.execute(instruction);
-                std::thread::sleep(Duration::from_millis(100 / 6));
-            }
+        if arg == "--help" || arg == "-h" {
+            eprintln!(
+                r#"Chip 8
+USAGE: [program_name] [COMMANDS...] <program_name>
+    --dbg | -d: Debug mode
+
+Example:
+    chip-eight-rs --dbg test_program.c8"#
+            );
+            return Ok(());
         }
+        if i == num_args - 1 && i > 0 {
+            let _ = program_name.insert(arg.to_owned());
+        }
+    }
+
+    let Some(input) = program_name else {
+        eprintln!("Program is a required final argument");
+        std::process::exit(1);
     };
+
+    let Ok(input) = std::fs::read(input) else {
+        eprintln!("Test program does not exist");
+        std::process::exit(2);
+    };
+
+    match running_mode {
+        RunningMode::Debug => {
+            let emulator: Emulator<DebugDrawer> = Emulator::init(input, running_mode)?;
+            emulator.run();
+        }
+        RunningMode::Normal => {
+            let emulator: Emulator<Drawer> = Emulator::init(input, running_mode)?;
+            emulator.run();
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -254,7 +345,8 @@ mod tests {
 
     #[test]
     fn it_can_fetch_an_instruction() {
-        let mut emulator = Emulator::<Drawer>::init().expect("All initial memory is in range");
+        let mut emulator = Emulator::<DebugDrawer>::init(vec![], RunningMode::Normal)
+            .expect("All initial memory is in range");
 
         emulator
             .set_font(&FONT)
