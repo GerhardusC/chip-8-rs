@@ -40,6 +40,62 @@ struct Emulator<T: Draw> {
 }
 
 #[derive(Debug)]
+enum LogicalOperator {
+    // 8XY0: Set
+    // VX is set to the value of VY.
+    Set,
+    // 8XY1: Binary OR
+    // VX is set to the bitwise/binary logical disjunction (OR) of VX and VY. VY is not affected.
+    BinaryOr,
+    // 8XY2: Binary AND
+    // VX is set to the bitwise/binary logical conjunction (AND) of VX and VY. VY is not affected.
+    BinaryAnd,
+    // 8XY3: Logical XOR
+    // VX is set to the bitwise/binary exclusive OR (XOR) of VX and VY. VY is not affected.
+    LogicalXor,
+    // 8XY4: Add
+    // VX is set to the value of VX plus the value of VY. VY is not affected.
+    // Unlike 7XNN, this addition will affect the carry flag. If the result is larger than 255 (and thus overflows the 8-bit register VX), the flag register VF is set to 1. If it doesn’t overflow, VF is set to 0.
+    AddAffectingCarry,
+    // 8XY5 and 8XY7: Subtract
+    // These both subtract the value in one register from the other, and put the result in VX. In both cases, VY is not affected.
+    // 8XY5 sets VX to the result of VX - VY.
+    // This subtraction will also affect the carry flag, but note that it’s opposite from what you might think. If the minuend (the first operand) is larger than or equal to the subtrahend (second operand), VF will be set to 1. If the subtrahend is larger, and we “underflow” the result, VF is set to 0. Another way of thinking of it is that VF is set to 1 before the subtraction, and then the subtraction either borrows from VF (setting it to 0) or not.
+    Subtract,
+    // 8XY7 sets VX to the result of VY - VX.
+    SubtractReverse,
+    Shift(Direction),
+    Invalid,
+}
+
+#[derive(Debug)]
+enum Direction {
+    Left,
+    Right,
+}
+
+impl From<u16> for LogicalOperator {
+    fn from(value: u16) -> Self {
+        let bit = value & 0xF;
+        match bit {
+            0x0 => Self::Set,
+            0x1 => Self::BinaryOr,
+            0x2 => Self::BinaryAnd,
+            0x3 => Self::LogicalXor,
+            0x4 => Self::AddAffectingCarry,
+            0x5 => Self::Subtract,
+            0x6 | 0xE => Self::Shift(if value == 0x6 {
+                Direction::Right
+            } else {
+                Direction::Left
+            }),
+            0x7 => Self::SubtractReverse,
+            _ => Self::Invalid,
+        }
+    }
+}
+
+#[derive(Debug)]
 enum Instruction {
     // 00E0 (clear screen)
     ClearScreen,
@@ -79,6 +135,11 @@ enum Instruction {
         register_x: usize,
         register_y: usize,
     },
+    LogicalOperator {
+        operator: LogicalOperator,
+        register_x: usize,
+        register_y: usize,
+    },
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]
@@ -115,7 +176,11 @@ impl From<u16> for Instruction {
                 register: (0xF00 & value) as usize >> 8,
                 value: (0xFF & value) as u8,
             },
-            0x8 => Self::Unimplemented(value),
+            0x8 => Self::LogicalOperator {
+                operator: LogicalOperator::from(value),
+                register_x: (0x0F00 & value) as usize >> 8,
+                register_y: (0x00F0 & value) as usize >> 4,
+            },
             0x9 => Self::SkipNotEqRegisters {
                 register_x: (value & 0x0F00) as usize >> 8,
                 register_y: (value & 0x00F0) as usize >> 4,
@@ -248,6 +313,70 @@ impl<T: Draw> Emulator<T> {
                 let vy_value = self.variable_registers[register_y];
                 if vx_value != vy_value {
                     self.program_counter += 2;
+                }
+            }
+            Instruction::LogicalOperator {
+                operator,
+                register_x,
+                register_y,
+            } => {
+                match operator {
+                    LogicalOperator::Set => {
+                        self.variable_registers[register_x] = self.variable_registers[register_y];
+                    }
+                    LogicalOperator::BinaryOr => {
+                        self.variable_registers[register_x] |= self.variable_registers[register_y];
+                    }
+                    LogicalOperator::BinaryAnd => {
+                        self.variable_registers[register_x] &= self.variable_registers[register_y];
+                    }
+                    LogicalOperator::LogicalXor => {
+                        self.variable_registers[register_x] ^= self.variable_registers[register_y];
+                    }
+                    LogicalOperator::AddAffectingCarry => {
+                        let res = self.variable_registers[register_x] as u16
+                            + self.variable_registers[register_y] as u16;
+                        self.variable_registers[0xF] = if res > 255 { 1 } else { 0 };
+                        self.variable_registers[register_x] = res as u8;
+                    }
+                    LogicalOperator::Subtract => {
+                        let res = self.variable_registers[register_x] as i16
+                            - self.variable_registers[register_y] as i16;
+                        self.variable_registers[0xF] = if res > 0 { 1 } else { 0 };
+                        self.variable_registers[register_x] = res as u8;
+                    }
+                    LogicalOperator::SubtractReverse => {
+                        let res = self.variable_registers[register_y] as i16
+                            - self.variable_registers[register_x] as i16;
+                        self.variable_registers[0xF] = if res > 0 { 1 } else { 0 };
+                        self.variable_registers[register_x] = res as u8;
+                    }
+                    LogicalOperator::Shift(direction) => {
+                        // TODO: Possible feature to optionally set VX to the value of VY
+                        match direction {
+                            Direction::Left => {
+                                let top = self.variable_registers[register_y] | 0b10000000;
+                                if top > 0 {
+                                    self.variable_registers[0xF] = 1
+                                } else {
+                                    self.variable_registers[0xF] = 0
+                                };
+                                let res = self.variable_registers[register_y] << 1;
+                                self.variable_registers[register_x] = res;
+                            }
+                            Direction::Right => {
+                                let top = self.variable_registers[register_y] | 0b1;
+                                if top > 0 {
+                                    self.variable_registers[0xF] = 1
+                                } else {
+                                    self.variable_registers[0xF] = 0
+                                };
+                                let res = self.variable_registers[register_y] >> 1;
+                                self.variable_registers[register_x] = res;
+                            }
+                        }
+                    }
+                    LogicalOperator::Invalid => {}
                 }
             }
             Instruction::Unimplemented(_) => {}
