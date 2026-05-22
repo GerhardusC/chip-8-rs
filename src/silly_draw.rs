@@ -32,11 +32,15 @@ impl Draw for Drawer {
 }
 
 fn create_buffer_string(buf: &[u8], screen_width: usize) -> String {
-    buf.chunks(screen_width).map(|chars| {
-        chars.iter().map(|c| {
-            if *c > 0 {'█'} else {' '}
-        }).collect()
-    }).collect::<Vec<String>>().join("\n")
+    buf.chunks(screen_width)
+        .map(|chars| {
+            chars
+                .iter()
+                .map(|c| if *c > 0 { '█' } else { ' ' })
+                .collect()
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
 }
 
 impl Drop for Drawer {
