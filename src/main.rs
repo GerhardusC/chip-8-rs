@@ -4,7 +4,9 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-use chip_eight::{ApplicationError, DebugDrawer, Draw, Drawer, SCREEN_HEIGHT, SCREEN_WIDTH};
+use chip_eight::{
+    ApplicationError, DebugDrawer, Draw, Drawer, InputListener, SCREEN_HEIGHT, SCREEN_WIDTH,
+};
 
 const FONT: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -521,10 +523,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut program_name = None;
 
     for (i, arg) in args.enumerate() {
-        if arg == "--dbg" || arg == "-d" {
+        if arg == "--test-input" || arg == "-t" {
+            let mut silly_input = InputListener::new();
+
+            silly_input.listen()?;
+            while let Ok(chip_eight::InputEvent::Character(c)) = silly_input.event_receiver.recv() {
+                println!("{c}");
+            }
+
+            return Ok(());
+        } else if arg == "--dbg" || arg == "-d" {
             running_mode = RunningMode::Debug;
-        }
-        if arg == "--help" || arg == "-h" {
+        } else if arg == "--help" || arg == "-h" {
             eprintln!(
                 r#"Chip 8
 USAGE: [program_name] [COMMANDS...] <program_name>
