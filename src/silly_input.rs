@@ -4,7 +4,6 @@ const ICANON: u32 = 0x00000002;
 const ECHO: u32 = 0x00000008;
 const TCSANOW: i32 = 0;
 
-
 // NOTE: From C termios
 // struct termios
 //   {
