@@ -1,4 +1,8 @@
-use std::{error::Error, sync::atomic::AtomicU16, time::Duration};
+use std::{
+    error::Error,
+    sync::atomic::AtomicU16,
+    time::{Duration, UNIX_EPOCH},
+};
 
 use chip_eight::{ApplicationError, DebugDrawer, Draw, Drawer, SCREEN_HEIGHT, SCREEN_WIDTH};
 
@@ -140,6 +144,14 @@ enum Instruction {
         register_x: usize,
         register_y: usize,
     },
+    JumpWithOffset {
+        register_x: usize,
+        address: usize,
+    },
+    Random {
+        register_x: usize,
+        val_to_and: u8,
+    },
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]
@@ -187,8 +199,15 @@ impl From<u16> for Instruction {
             },
             // ANNN (set index register I)
             0xA => Self::SetIndexRegister(0xFFF & value),
-            0xB => Self::Unimplemented(value),
-            0xC => Self::Unimplemented(value),
+            // BNNN: Jump with offset
+            0xB => Self::JumpWithOffset {
+                register_x: (value & 0x0F00) as usize >> 8,
+                address: (value & 0x0FFF) as usize,
+            },
+            0xC => Self::Random {
+                register_x: (value & 0x0F00) as usize >> 8,
+                val_to_and: (value & 0x00FF) as u8,
+            },
             // DXYN (display/draw)
             0xD => Self::Draw {
                 x_register: (0xF00 & value) as usize >> 8,
@@ -378,6 +397,23 @@ impl<T: Draw> Emulator<T> {
                     }
                     LogicalOperator::Invalid => {}
                 }
+            }
+            Instruction::JumpWithOffset {
+                register_x,
+                address,
+            } => {
+                self.program_counter = address + self.variable_registers[register_x] as usize;
+            }
+            Instruction::Random {
+                register_x,
+                val_to_and,
+            } => {
+                let randint = (std::time::SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Now is always after unix epoch")
+                    .as_micros()
+                    % 255) as u8;
+                self.variable_registers[register_x] = randint & val_to_and;
             }
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
