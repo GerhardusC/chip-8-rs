@@ -32,19 +32,11 @@ impl Draw for Drawer {
 }
 
 fn create_buffer_string(buf: &[u8], screen_width: usize) -> String {
-    let mut s = String::new();
-    for (i, b) in buf.iter().enumerate() {
-        if (i % screen_width) == 0 && i != 0 {
-            s.push('\n');
-        }
-        if *b > 0 {
-            s.push('█');
-        } else {
-            s.push(' ');
-        };
-    }
-    s.push('\n');
-    s
+    buf.chunks(screen_width).map(|chars| {
+        chars.iter().map(|c| {
+            if *c > 0 {'█'} else {' '}
+        }).collect()
+    }).collect::<Vec<String>>().join("\n")
 }
 
 impl Drop for Drawer {
@@ -67,7 +59,7 @@ mod tests {
   █ █  
    █   
   █ █  
- █   █ \n";
+ █   █ ";
 
         let s = create_buffer_string(&b, 7);
         assert_eq!(s, expected);
