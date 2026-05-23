@@ -105,6 +105,10 @@ impl From<u16> for LogicalOperator {
 enum Instruction {
     // 00E0 (clear screen)
     ClearScreen,
+    // 00EE (return)
+    Return,
+    // 2NNN (Subroutine)
+    Call(usize),
     // 1NNN (jump)
     Jump(u16),
     // 6XNN (set register VX)
@@ -164,10 +168,18 @@ impl From<u16> for Instruction {
     fn from(value: u16) -> Self {
         match value >> 12 {
             // 00E0 (clear screen)
-            0x0 => Self::ClearScreen,
+            0x0 => {
+                if value == 0x00EE {
+                    Self::Return
+                } else if value == 0x00E0 {
+                    Self::ClearScreen
+                } else {
+                    Self::Unimplemented(value)
+                }
+            }
             // 1NNN (jump)
             0x1 => Self::Jump(0x0FFF & value),
-            0x2 => Self::Unimplemented(value),
+            0x2 => Self::Call((0x0FFF & value) as usize),
             0x3 => Self::SkipEqValueWithRegisterContents {
                 register: (value & 0x0F00) as usize >> 8,
                 value: (value & 0x00FF) as u8,
@@ -416,6 +428,15 @@ impl<T: Draw> Emulator<T> {
                     .as_micros()
                     % 255) as u8;
                 self.variable_registers[register_x] = randint & val_to_and;
+            }
+            Instruction::Return => {
+                if let Some(val) = self.stack.pop() {
+                    self.program_counter = val;
+                };
+            }
+            Instruction::Call(memory_addr) => {
+                self.stack.push(self.program_counter);
+                self.program_counter = memory_addr;
             }
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
