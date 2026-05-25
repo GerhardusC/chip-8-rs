@@ -1,6 +1,7 @@
 use std::{
     error::Error,
-    sync::atomic::AtomicU16,
+    sync::{atomic::AtomicU16, mpsc},
+    thread::JoinHandle,
     time::{Duration, UNIX_EPOCH},
 };
 
@@ -32,6 +33,8 @@ struct Emulator<T: Draw> {
     // TODO: Check if stack pointer needs to exist
     #[allow(unused)]
     stack: Vec<usize>,
+    #[allow(unused)]
+    keys: [u8; 16],
     variable_registers: [u8; 16],
     screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
     font_addr: usize,
@@ -243,7 +246,8 @@ impl<T: Draw> Emulator<T> {
         let mut emulator = Self {
             memory: [0; 0x1000],
             stack: vec![],
-            variable_registers: [0; 0x10],
+            keys: [0; 16],
+            variable_registers: [0; 16],
             screen_buffer: [0; SCREEN_WIDTH * SCREEN_HEIGHT],
             font_addr: 0x50,
             index_register: 0,
@@ -523,6 +527,7 @@ impl<T: Draw> Emulator<T> {
                 }
                 RunningMode::Normal => loop {
                     let instruction = self.fetch();
+                    // TODO: Take input here
                     self.execute(instruction);
                     std::thread::sleep(Duration::from_millis(100 / 6));
                 },
@@ -545,11 +550,29 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for (i, arg) in args.enumerate() {
         if arg == "--test-input" || arg == "-t" {
-            let mut silly_input = InputListener::new();
+            let (tx, rx) = mpsc::channel();
 
-            silly_input.listen()?;
-            while let Ok(chip_eight::InputEvent::Character(c)) = silly_input.event_receiver.recv() {
-                println!("{c}");
+            let tx = tx.clone();
+            let _: JoinHandle<Result<(), String>> = std::thread::spawn(move || {
+                InputListener::new(tx)
+                    .max_age(300)
+                    .max_update_delay(10)
+                    .listen()
+                    .map_err(|e| e.to_string())?;
+
+                Ok(())
+            });
+
+            while let Ok(e) = rx.recv() {
+                match e {
+                    chip_eight::InputBroadcastEvent::KeyState(hash_map) => {
+                        dbg!(hash_map);
+                    }
+                    chip_eight::InputBroadcastEvent::Close => {
+                        dbg!("Exiting, {}", e);
+                        break;
+                    }
+                }
             }
 
             return Ok(());

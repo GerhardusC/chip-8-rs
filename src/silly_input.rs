@@ -1,4 +1,15 @@
-use std::{error::Error, io::Read, sync::mpsc, thread::JoinHandle};
+use std::{
+    collections::HashMap,
+    error::Error,
+    io::Read,
+    sync::{
+        Arc,
+        atomic::AtomicBool,
+        mpsc::{self, Sender},
+    },
+    thread::JoinHandle,
+    time::{Duration, SystemTime},
+};
 
 const ICANON: u32 = 0x00000002;
 const ECHO: u32 = 0x00000008;
@@ -35,26 +46,34 @@ unsafe extern "C" {
     fn tcsetattr(fd: i32, optional_flags: i32, termios_pointer: *const Termios) -> i32;
 }
 
+#[derive(Debug)]
+pub enum InputBroadcastEvent {
+    KeyState(HashMap<char, SystemTime>),
+    Close,
+}
+
 pub enum InputEvent {
+    Broadcast,
     Character(char),
     Close,
 }
 
+pub struct InputState {}
+
 #[derive(Debug)]
 pub struct InputListener {
-    pub event_receiver: mpsc::Receiver<InputEvent>,
-    event_sender: mpsc::Sender<InputEvent>,
+    max_age: u32,
+    max_update_delay: u32,
+    state_sender: Sender<InputBroadcastEvent>,
+    keys: HashMap<char, SystemTime>,
+    internal_event_receiver: mpsc::Receiver<InputEvent>,
+    internal_event_sender: mpsc::Sender<InputEvent>,
     original_state: Termios,
-}
-
-impl Default for InputListener {
-    fn default() -> Self {
-        Self::new()
-    }
+    should_stop: Arc<AtomicBool>,
 }
 
 impl InputListener {
-    pub fn new() -> Self {
+    pub fn new(tx: Sender<InputBroadcastEvent>) -> Self {
         let mut original = unsafe { std::mem::zeroed() };
 
         unsafe {
@@ -68,39 +87,115 @@ impl InputListener {
             tcsetattr(0, TCSANOW, &modified);
         }
 
-        let (tx, rx) = mpsc::channel();
+        let (internal_tx, internal_rx) = mpsc::channel();
 
         Self {
             original_state: original,
-            event_receiver: rx,
-            event_sender: tx,
+            internal_event_receiver: internal_rx,
+            internal_event_sender: internal_tx,
+            state_sender: tx,
+            keys: HashMap::new(),
+            should_stop: Arc::new(AtomicBool::new(false)),
+            max_update_delay: 10,
+            max_age: 300,
         }
+    }
+
+    pub fn max_update_delay(&mut self, max_update_delay: u32) -> &mut Self {
+        self.max_update_delay = max_update_delay;
+        self
+    }
+
+    pub fn max_age(&mut self, max_age: u32) -> &mut Self {
+        self.max_age = max_age;
+        self
     }
 
     pub fn listen(&mut self) -> Result<(), Box<dyn Error>> {
         let mut buf = [0; 1];
         let mut stdin = std::io::stdin();
 
-        let sender = self.event_sender.clone();
+        let input_sender = self.internal_event_sender.clone();
         let _: JoinHandle<Result<(), String>> = std::thread::spawn(move || {
             loop {
                 stdin.read_exact(&mut buf).map_err(|e| e.to_string())?;
                 // NOTE: Use ESC or CTRL-D to exit
                 if buf[0] == 4 || buf[0] == 27 {
-                    sender.send(InputEvent::Close).map_err(|e| e.to_string())?;
+                    input_sender
+                        .send(InputEvent::Close)
+                        .map_err(|e| e.to_string())?;
                     return Ok(());
                 }
-                sender
+                input_sender
                     .send(InputEvent::Character(buf[0].into()))
                     .map_err(|e| e.to_string())?;
             }
         });
+
+        let should_stop = self.should_stop.clone();
+        let pulse_sender = self.internal_event_sender.clone();
+        let max_update_delay = self.max_update_delay;
+        let _: JoinHandle<Result<(), String>> = std::thread::spawn(move || {
+            loop {
+                pulse_sender
+                    .send(InputEvent::Broadcast)
+                    .map_err(|e| e.to_string())?;
+                std::thread::sleep(Duration::from_millis(max_update_delay.into()));
+                if should_stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+            }
+            Ok(())
+        });
+
+        // Main listern loop
+        while let Ok(e) = self.internal_event_receiver.recv() {
+            match e {
+                InputEvent::Broadcast => {
+                    let mut chars = vec![];
+                    for (c, last_seen) in self.keys.iter() {
+                        let now = SystemTime::now();
+                        let age = now.duration_since(*last_seen)?;
+                        if age.as_millis() > self.max_age.into() {
+                            chars.push(*c);
+                        }
+                    }
+                    // Separate loop, I know, but I can't mutate the thing I'm looping over, which
+                    // kinda makes sense tbh
+                    for x in chars {
+                        self.keys.remove(&x);
+                    }
+
+                    if let Err(e) = self
+                        .state_sender
+                        .send(InputBroadcastEvent::KeyState(self.keys.clone()))
+                    {
+                        dbg!(e);
+                    };
+                }
+                InputEvent::Character(c) => {
+                    dbg!(c);
+                    self.keys.insert(c, SystemTime::now());
+                }
+                InputEvent::Close => {
+                    dbg!("CLOSE EVENT FIRED IN MAIN LISTERN LOOP");
+                    break;
+                }
+            }
+        }
+
         Ok(())
     }
 }
 
 impl Drop for InputListener {
     fn drop(&mut self) {
+        let _ = self.internal_event_sender.send(InputEvent::Close);
+        // TODO: Check if I should do some sort of enum for the "state sender" to do cleanup, ie.
+        // be able to send close event.
+        let _ = self.state_sender.send(InputBroadcastEvent::Close);
+        self.should_stop
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         unsafe {
             tcsetattr(0, TCSANOW, &self.original_state);
         }
