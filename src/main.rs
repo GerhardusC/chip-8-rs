@@ -1,11 +1,11 @@
 use std::{
     error::Error,
     sync::atomic::AtomicU16,
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use chip_eight::{
-    ApplicationError, DebugDrawer, Draw, Drawer, InputState, ReadInputState, SCREEN_HEIGHT,
+    ApplicationError, DebugDrawer, Draw, Drawer, InputListener, ReadInputState, SCREEN_HEIGHT,
     SCREEN_WIDTH,
 };
 
@@ -550,16 +550,31 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for (i, arg) in args.enumerate() {
         if arg == "--test-input" || arg == "-t" {
-            let input_state = InputState::init();
+            let input_state = InputListener::init();
             loop {
-                let keys = input_state.read_keys_state()?;
-                if let Some(_) = keys.get(&'q') {
-                    eprintln!("EXITING, PRESS Q AGAIN TO QUIT");
+                let mut keys = input_state.read_keys_state()?;
+                if keys.contains_key(&'q') {
+                    eprintln!("EXITING");
                     input_state.close();
                     return Ok(());
                 };
+                let now = SystemTime::now();
+                let mut to_remove = vec![];
+                for (key, val) in keys.iter() {
+                    if now
+                        .duration_since(*val)
+                        .expect("Before should be earlier tha now")
+                        > Duration::from_millis(300)
+                    {
+                        to_remove.push(*key);
+                    }
+                }
+                for c in to_remove {
+                    keys.remove(&c);
+                }
+
                 dbg!(keys);
-                std::thread::sleep(Duration::from_millis(100));
+                std::thread::sleep(Duration::from_millis(6));
             }
             // return Ok(());
         } else if arg == "--dbg" || arg == "-d" {
