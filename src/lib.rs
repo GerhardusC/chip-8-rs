@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, fmt::Display, time::SystemTime};
+use std::{error::Error, fmt::Display};
 
 mod debug_draw;
 mod dummy_input;
@@ -24,7 +24,7 @@ pub trait Draw {
 
 pub trait ReadInputState {
     fn init() -> Self;
-    fn read_keys_state(&self) -> Result<HashMap<char, SystemTime>, String>;
+    fn read_keys_state(&self) -> Result<[u8; 16], String>;
 }
 
 #[derive(Debug)]

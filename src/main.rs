@@ -1,7 +1,4 @@
-use std::{
-    error::Error,
-    time::{Duration, SystemTime},
-};
+use std::{error::Error, time::Duration};
 
 use chip_eight::{
     DebugDrawer, Drawer, DummyInput, Emulator, InputListener, ReadInputState, RunningMode,
@@ -18,26 +15,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         if arg == "--test-input" || arg == "-t" {
             let input_state = InputListener::init();
             loop {
-                let mut keys = input_state.read_keys_state()?;
-                if keys.contains_key(&'q') {
+                let keys = input_state.read_keys_state()?;
+                if let Some(key) = keys.last()
+                    && *key > 0
+                {
                     eprintln!("EXITING");
                     return Ok(());
-                };
-                let now = SystemTime::now();
-                let mut to_remove = vec![];
-                for (key, val) in keys.iter() {
-                    if now
-                        .duration_since(*val)
-                        .expect("Before should be earlier tha now")
-                        > Duration::from_millis(300)
-                    {
-                        to_remove.push(*key);
-                    }
                 }
-                for c in to_remove {
-                    keys.remove(&c);
-                }
-
                 dbg!(keys);
                 std::thread::sleep(Duration::from_millis(6));
             }

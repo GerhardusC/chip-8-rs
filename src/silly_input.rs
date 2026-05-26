@@ -7,7 +7,7 @@ use std::{
         mpsc::{self},
     },
     thread::JoinHandle,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use crate::ReadInputState;
@@ -47,6 +47,29 @@ unsafe extern "C" {
     fn tcsetattr(fd: i32, optional_flags: i32, termios_pointer: *const Termios) -> i32;
 }
 
+pub fn convert_keymap(max_delay: Duration, key_map: &HashMap<char, SystemTime>) -> [u8; 16] {
+    let mut res = [
+        b'1', b'2', b'3', b'4', b'q', b'w', b'e', b'r', b'a', b's', b'd', b'f', b'z', b'x', b'c',
+        b'v',
+    ];
+    let now = SystemTime::now();
+
+    for ch in res.iter_mut() {
+        if let Some(timestamp) = key_map.get(&(char::from(*ch)))
+            && now
+                .duration_since(*timestamp)
+                .expect("Now is definitely after earlier.")
+                < max_delay
+        {
+            *ch = 1
+        } else {
+            *ch = 0
+        }
+    }
+
+    res
+}
+
 #[derive(Debug)]
 pub struct InputListener {
     keys: Arc<RwLock<HashMap<char, SystemTime>>>,
@@ -78,9 +101,9 @@ impl ReadInputState for InputListener {
         listener
     }
 
-    fn read_keys_state(&self) -> Result<HashMap<char, SystemTime>, String> {
+    fn read_keys_state(&self) -> Result<[u8; 16], String> {
         if let Ok(x) = self.keys.read() {
-            Ok(x.clone())
+            Ok(convert_keymap(Duration::from_millis(100), &x))
         } else {
             Err("Failed to read keys state".to_string())
         }
@@ -91,7 +114,7 @@ impl InputListener {
     fn listen(&mut self) -> Result<(), Box<dyn Error>> {
         let mut stdin = std::io::stdin();
 
-        let (internal_tx, internal_rx) = mpsc::channel();
+        let (internal_tx, internal_rx) = mpsc::channel::<char>();
 
         let input_sender = internal_tx.clone();
         let _: JoinHandle<Result<(), String>> = std::thread::spawn(move || {
@@ -99,7 +122,7 @@ impl InputListener {
             loop {
                 stdin.read_exact(&mut buf).map_err(|e| e.to_string())?;
                 input_sender
-                    .send(buf[0].into())
+                    .send(buf[0].to_ascii_lowercase().into())
                     .map_err(|e| e.to_string())?;
             }
         });

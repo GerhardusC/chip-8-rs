@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::ReadInputState;
 
 impl ReadInputState for DummyInput {
@@ -7,10 +5,8 @@ impl ReadInputState for DummyInput {
         Self
     }
 
-    fn read_keys_state(
-        &self,
-    ) -> Result<std::collections::HashMap<char, std::time::SystemTime>, String> {
-        Ok(HashMap::new())
+    fn read_keys_state(&self) -> Result<[u8; 16], String> {
+        Ok([0; 16])
     }
 }
 pub struct DummyInput;
