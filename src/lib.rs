@@ -1,10 +1,12 @@
 use std::{collections::HashMap, error::Error, fmt::Display, time::SystemTime};
 
 mod debug_draw;
+mod emulator;
 mod silly_draw;
 mod silly_input;
 
 pub use debug_draw::*;
+pub use emulator::*;
 pub use silly_draw::*;
 pub use silly_input::*;
 
