@@ -5,7 +5,8 @@ use std::{
 };
 
 use chip_eight::{
-    ApplicationError, DebugDrawer, Draw, Drawer, InputListener, SCREEN_HEIGHT, SCREEN_WIDTH,
+    ApplicationError, DebugDrawer, Draw, Drawer, InputState, ReadInputState, SCREEN_HEIGHT,
+    SCREEN_WIDTH,
 };
 
 const FONT: [u8; 80] = [
@@ -549,23 +550,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for (i, arg) in args.enumerate() {
         if arg == "--test-input" || arg == "-t" {
-            let (jh, rx) = InputListener::init(Some(10), Some(300));
-            while let Ok(e) = rx.recv() {
-                match e {
-                    chip_eight::InputBroadcastEvent::KeyState(hash_map) => {
-                        dbg!(hash_map);
-                    }
-                    chip_eight::InputBroadcastEvent::Close => {
-                        eprintln!("Broadcast closed");
-                        if let Err(e) = jh.join() {
-                            eprintln!("Failed to join input listener jh");
-                            dbg!(e);
-                        };
-                        break;
-                    }
-                }
+            let input_state = InputState::init();
+            loop {
+                let keys = input_state.read_keys_state()?;
+                if let Some(_) = keys.get(&'q') {
+                    eprintln!("EXITING, PRESS Q AGAIN TO QUIT");
+                    input_state.close();
+                    return Ok(());
+                };
+                dbg!(keys);
+                std::thread::sleep(Duration::from_millis(100));
             }
-            return Ok(());
+            // return Ok(());
         } else if arg == "--dbg" || arg == "-d" {
             running_mode = RunningMode::Debug;
         } else if arg == "--help" || arg == "-h" {

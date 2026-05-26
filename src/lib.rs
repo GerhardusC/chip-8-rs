@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{collections::HashMap, error::Error, fmt::Display, time::SystemTime};
 
 mod debug_draw;
 mod silly_draw;
@@ -16,6 +16,12 @@ pub trait Draw {
     fn draw_buffer(&self, screen_buf: &[u8]);
     fn return_home(&self);
     fn clear_screen(&self);
+}
+
+pub trait ReadInputState {
+    fn init() -> Self;
+    fn read_keys_state(&self) -> Result<HashMap<char, SystemTime>, String>;
+    fn close(self);
 }
 
 #[derive(Debug)]
