@@ -392,7 +392,11 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         // TODO: Possible feature to optionally set VX to the value of VY
                         match direction {
                             Direction::Left => {
-                                let top = self.variable_registers[register_y] | 0b10000000;
+                                // NEXT LINE ONLY IN QUIRKS
+                                self.variable_registers[register_x] =
+                                    self.variable_registers[register_y];
+
+                                let top = self.variable_registers[register_y] as u16;
                                 if top > 0 {
                                     self.variable_registers[0xF] = 1
                                 } else {
@@ -402,8 +406,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                                 self.variable_registers[register_x] = res;
                             }
                             Direction::Right => {
-                                let top = self.variable_registers[register_y] | 0b1;
-                                if top > 0 {
+                                // NEXT LINE ONLY IN QUIRKS
+                                self.variable_registers[register_x] =
+                                    self.variable_registers[register_y];
+
+                                let bot = self.variable_registers[register_y] | 0b1;
+                                if bot > 0 {
                                     self.variable_registers[0xF] = 1
                                 } else {
                                     self.variable_registers[0xF] = 0
@@ -529,7 +537,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     let instruction = self.fetch();
                     // TODO: Take input here
                     self.execute(instruction);
-                    std::thread::sleep(Duration::from_millis(100));
+                    std::thread::sleep(Duration::from_millis(6));
                 },
             };
         });
