@@ -21,7 +21,6 @@ pub trait Draw {
 pub trait ReadInputState {
     fn init() -> Self;
     fn read_keys_state(&self) -> Result<HashMap<char, SystemTime>, String>;
-    fn close(self);
 }
 
 #[derive(Debug)]

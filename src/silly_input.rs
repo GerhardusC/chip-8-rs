@@ -4,7 +4,6 @@ use std::{
     io::Read,
     sync::{
         Arc, RwLock,
-        atomic::AtomicBool,
         mpsc::{self},
     },
     thread::JoinHandle,
@@ -48,16 +47,10 @@ unsafe extern "C" {
     fn tcsetattr(fd: i32, optional_flags: i32, termios_pointer: *const Termios) -> i32;
 }
 
-enum InputEvent {
-    Character(char),
-    Close,
-}
-
 #[derive(Debug)]
 pub struct InputListener {
     keys: Arc<RwLock<HashMap<char, SystemTime>>>,
     original_state: Termios,
-    should_stop: Arc<AtomicBool>,
 }
 
 impl ReadInputState for InputListener {
@@ -78,7 +71,6 @@ impl ReadInputState for InputListener {
         let mut listener = Self {
             keys: Arc::new(RwLock::new(HashMap::new())),
             original_state: original,
-            should_stop: Arc::new(AtomicBool::new(false)),
         };
 
         let _ = listener.listen().map_err(|e| e.to_string());
@@ -93,62 +85,30 @@ impl ReadInputState for InputListener {
             Err("Failed to read keys state".to_string())
         }
     }
-
-    fn close(self) {
-        self.should_stop
-            .store(true, std::sync::atomic::Ordering::Relaxed);
-    }
 }
 
 impl InputListener {
     fn listen(&mut self) -> Result<(), Box<dyn Error>> {
-        let mut buf = [0; 1];
         let mut stdin = std::io::stdin();
-        let mut join_handles = vec![];
 
         let (internal_tx, internal_rx) = mpsc::channel();
 
         let input_sender = internal_tx.clone();
-        let should_stop = self.should_stop.clone();
-        let jh: JoinHandle<Result<(), String>> = std::thread::spawn(move || {
+        let _: JoinHandle<Result<(), String>> = std::thread::spawn(move || {
+            let mut buf = [0; 1];
             loop {
                 stdin.read_exact(&mut buf).map_err(|e| e.to_string())?;
-                // NOTE: Use ESC or CTRL-D to exit
-                if should_stop.load(std::sync::atomic::Ordering::Relaxed) {
-                    input_sender
-                        .send(InputEvent::Close)
-                        .map_err(|e| e.to_string())?;
-                    return Ok(());
-                }
                 input_sender
-                    .send(InputEvent::Character(buf[0].into()))
+                    .send(buf[0].into())
                     .map_err(|e| e.to_string())?;
             }
         });
-        join_handles.push(jh);
 
-        // Main listern loop
         let keys = self.keys.clone();
-        let should_stop = self.should_stop.clone();
         std::thread::spawn(move || {
-            while let Ok(e) = internal_rx.recv() {
-                match e {
-                    InputEvent::Character(c) => {
-                        // TODO: Clear stale chars
-                        if let Ok(mut keys) = keys.write() {
-                            keys.insert(c, SystemTime::now());
-                        }
-                    }
-                    InputEvent::Close => {
-                        should_stop.store(true, std::sync::atomic::Ordering::Relaxed);
-
-                        for jh in join_handles.into_iter() {
-                            if let Err(e) = jh.join() {
-                                dbg!(e);
-                            }
-                        }
-                        break;
-                    }
+            while let Ok(c) = internal_rx.recv() {
+                if let Ok(mut keys) = keys.write() {
+                    keys.insert(c, SystemTime::now());
                 }
             }
         });

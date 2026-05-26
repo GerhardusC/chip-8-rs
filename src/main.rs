@@ -555,7 +555,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut keys = input_state.read_keys_state()?;
                 if keys.contains_key(&'q') {
                     eprintln!("EXITING");
-                    input_state.close();
                     return Ok(());
                 };
                 let now = SystemTime::now();
