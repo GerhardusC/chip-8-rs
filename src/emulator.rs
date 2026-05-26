@@ -3,7 +3,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-use crate::{ApplicationError, Draw, SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::{ApplicationError, Draw, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 const FONT: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -24,7 +24,7 @@ const FONT: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
-pub struct Emulator<T: Draw> {
+pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
     // TODO: Check if stack pointer needs to exist
     #[allow(unused)]
@@ -41,6 +41,8 @@ pub struct Emulator<T: Draw> {
     #[allow(unused)]
     sound_timer: AtomicU16,
     drawer: T,
+    #[allow(unused)]
+    input_provider: P,
     running_mode: RunningMode,
 }
 
@@ -237,7 +239,7 @@ impl From<u16> for Instruction {
     }
 }
 
-impl<T: Draw> Emulator<T> {
+impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     pub fn init(program: Vec<u8>, running_mode: RunningMode) -> Result<Self, ApplicationError> {
         let mut emulator = Self {
             memory: [0; 0x1000],
@@ -252,6 +254,7 @@ impl<T: Draw> Emulator<T> {
             sound_timer: AtomicU16::new(0),
             drawer: T::init(),
             running_mode,
+            input_provider: P::init(),
         };
 
         emulator.set_mem_block(&program, 0x200)?;
@@ -314,7 +317,8 @@ impl<T: Draw> Emulator<T> {
                 self.variable_registers[register] = value
             }
             Instruction::AddToRegister { register, value } => {
-                self.variable_registers[register] += value
+                let val: u16 = value as u16 + self.variable_registers[register] as u16;
+                self.variable_registers[register] = (val & 0xFF) as u8;
             }
             Instruction::SkipEqValueWithRegisterContents { register, value } => {
                 let vx_value = self.variable_registers[register];
@@ -370,19 +374,19 @@ impl<T: Draw> Emulator<T> {
                         let res = self.variable_registers[register_x] as u16
                             + self.variable_registers[register_y] as u16;
                         self.variable_registers[0xF] = if res > 255 { 1 } else { 0 };
-                        self.variable_registers[register_x] = res as u8;
+                        self.variable_registers[register_x] = (res & 0xFF) as u8;
                     }
                     LogicalOperator::Subtract => {
                         let res = self.variable_registers[register_x] as i16
                             - self.variable_registers[register_y] as i16;
                         self.variable_registers[0xF] = if res > 0 { 1 } else { 0 };
-                        self.variable_registers[register_x] = res as u8;
+                        self.variable_registers[register_x] = (res & 0xFF) as u8;
                     }
                     LogicalOperator::SubtractReverse => {
                         let res = self.variable_registers[register_y] as i16
                             - self.variable_registers[register_x] as i16;
                         self.variable_registers[0xF] = if res > 0 { 1 } else { 0 };
-                        self.variable_registers[register_x] = res as u8;
+                        self.variable_registers[register_x] = (res & 0xFF) as u8;
                     }
                     LogicalOperator::Shift(direction) => {
                         // TODO: Possible feature to optionally set VX to the value of VY
@@ -395,7 +399,7 @@ impl<T: Draw> Emulator<T> {
                                     self.variable_registers[0xF] = 0
                                 };
                                 let res = self.variable_registers[register_y] << 1;
-                                self.variable_registers[register_x] = res;
+                                self.variable_registers[register_x] = res & 0xFF;
                             }
                             Direction::Right => {
                                 let top = self.variable_registers[register_y] | 0b1;
@@ -405,7 +409,7 @@ impl<T: Draw> Emulator<T> {
                                     self.variable_registers[0xF] = 0
                                 };
                                 let res = self.variable_registers[register_y] >> 1;
-                                self.variable_registers[register_x] = res;
+                                self.variable_registers[register_x] = res & 0xFF;
                             }
                         }
                     }
@@ -525,7 +529,7 @@ impl<T: Draw> Emulator<T> {
                     let instruction = self.fetch();
                     // TODO: Take input here
                     self.execute(instruction);
-                    std::thread::sleep(Duration::from_millis(100 / 6));
+                    std::thread::sleep(Duration::from_millis(100));
                 },
             };
         });
@@ -539,13 +543,13 @@ pub enum RunningMode {
 
 #[cfg(test)]
 mod tests {
-    use crate::DebugDrawer;
+    use crate::{DebugDrawer, DummyInput};
 
     use super::*;
 
     #[test]
     fn it_can_fetch_an_instruction() {
-        let mut emulator = Emulator::<DebugDrawer>::init(vec![], RunningMode::Normal)
+        let mut emulator = Emulator::<DebugDrawer, DummyInput>::init(vec![], RunningMode::Normal)
             .expect("All initial memory is in range");
 
         emulator

@@ -4,11 +4,13 @@ mod debug_draw;
 mod emulator;
 mod silly_draw;
 mod silly_input;
+mod dummy_input;
 
 pub use debug_draw::*;
 pub use emulator::*;
 pub use silly_draw::*;
 pub use silly_input::*;
+pub use dummy_input::*;
 
 pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;

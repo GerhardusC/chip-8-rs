@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use chip_eight::{DebugDrawer, Drawer, Emulator, InputListener, ReadInputState, RunningMode};
+use chip_eight::{DebugDrawer, Drawer, DummyInput, Emulator, InputListener, ReadInputState, RunningMode};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = std::env::args();
@@ -39,7 +39,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 dbg!(keys);
                 std::thread::sleep(Duration::from_millis(6));
             }
-            // return Ok(());
         } else if arg == "--dbg" || arg == "-d" {
             running_mode = RunningMode::Debug;
         } else if arg == "--help" || arg == "-h" {
@@ -70,11 +69,11 @@ Example:
 
     match running_mode {
         RunningMode::Debug => {
-            let emulator: Emulator<DebugDrawer> = Emulator::init(input, running_mode)?;
+            let emulator: Emulator<DebugDrawer, DummyInput> = Emulator::init(input, running_mode)?;
             emulator.run();
         }
         RunningMode::Normal => {
-            let emulator: Emulator<Drawer> = Emulator::init(input, running_mode)?;
+            let emulator: Emulator<Drawer, InputListener> = Emulator::init(input, running_mode)?;
             emulator.run();
         }
     }
