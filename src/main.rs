@@ -1,7 +1,6 @@
 use std::{
     error::Error,
-    sync::{atomic::AtomicU16, mpsc},
-    thread::JoinHandle,
+    sync::atomic::AtomicU16,
     time::{Duration, UNIX_EPOCH},
 };
 
@@ -550,31 +549,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for (i, arg) in args.enumerate() {
         if arg == "--test-input" || arg == "-t" {
-            let (tx, rx) = mpsc::channel();
-
-            let tx = tx.clone();
-            let _: JoinHandle<Result<(), String>> = std::thread::spawn(move || {
-                InputListener::new(tx)
-                    .max_age(300)
-                    .max_update_delay(10)
-                    .listen()
-                    .map_err(|e| e.to_string())?;
-
-                Ok(())
-            });
-
+            let (jh, rx) = InputListener::init(Some(10), Some(300));
             while let Ok(e) = rx.recv() {
                 match e {
                     chip_eight::InputBroadcastEvent::KeyState(hash_map) => {
                         dbg!(hash_map);
                     }
                     chip_eight::InputBroadcastEvent::Close => {
-                        dbg!("Exiting, {}", e);
+                        eprintln!("Broadcast closed");
+                        if let Err(e) = jh.join() {
+                            eprintln!("Failed to join input listener jh");
+                            dbg!(e);
+                        };
                         break;
                     }
                 }
             }
-
             return Ok(());
         } else if arg == "--dbg" || arg == "-d" {
             running_mode = RunningMode::Debug;
