@@ -3,7 +3,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use chip_eight::{DebugDrawer, Drawer, DummyInput, Emulator, InputListener, ReadInputState, RunningMode};
+use chip_eight::{
+    DebugDrawer, Drawer, DummyInput, Emulator, InputListener, ReadInputState, RunningMode,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = std::env::args();

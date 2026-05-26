@@ -399,7 +399,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                                     self.variable_registers[0xF] = 0
                                 };
                                 let res = self.variable_registers[register_y] << 1;
-                                self.variable_registers[register_x] = res & 0xFF;
+                                self.variable_registers[register_x] = res;
                             }
                             Direction::Right => {
                                 let top = self.variable_registers[register_y] | 0b1;
@@ -409,7 +409,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                                     self.variable_registers[0xF] = 0
                                 };
                                 let res = self.variable_registers[register_y] >> 1;
-                                self.variable_registers[register_x] = res & 0xFF;
+                                self.variable_registers[register_x] = res;
                             }
                         }
                     }

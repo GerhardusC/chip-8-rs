@@ -7,7 +7,9 @@ impl ReadInputState for DummyInput {
         Self
     }
 
-    fn read_keys_state(&self) -> Result<std::collections::HashMap<char, std::time::SystemTime>, String> {
+    fn read_keys_state(
+        &self,
+    ) -> Result<std::collections::HashMap<char, std::time::SystemTime>, String> {
         Ok(HashMap::new())
     }
 }
