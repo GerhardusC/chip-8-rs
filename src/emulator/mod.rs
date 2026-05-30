@@ -1,3 +1,6 @@
-mod emulator;
+mod emulator_core;
+mod instructions;
+mod logical_operator;
+mod sub_commands;
 
-pub use emulator::*;
+pub use emulator_core::*;

@@ -1,4 +1,81 @@
+use crate::emulator::{logical_operator::LogicalOperator, sub_commands::FCommand};
 
+impl From<u16> for Instruction {
+    fn from(value: u16) -> Self {
+        match value >> 12 {
+            // 00E0 (clear screen)
+            0x0 => {
+                if value == 0x00EE {
+                    Self::Return
+                } else if value == 0x00E0 {
+                    Self::ClearScreen
+                } else {
+                    Self::Unimplemented(value)
+                }
+            }
+            // 1NNN (jump)
+            0x1 => Self::Jump(0x0FFF & value),
+            0x2 => Self::Call((0x0FFF & value) as usize),
+            0x3 => Self::SkipEqValueWithRegisterContents {
+                register: (value & 0x0F00) as usize >> 8,
+                value: (value & 0x00FF) as u8,
+            },
+            0x4 => Self::SkipNotEqValueWithRegisterContents {
+                register: (value & 0x0F00) as usize >> 8,
+                value: (value & 0x00FF) as u8,
+            },
+            0x5 => Self::SkipEqRegisters {
+                register_x: (value & 0x0F00) as usize >> 8,
+                register_y: (value & 0x00F0) as usize >> 4,
+            },
+            // 6XNN (set register VX)
+            0x6 => Self::SetGeneralRegister {
+                register: (0xF00 & value) as usize >> 8,
+                value: (0xFF & value) as u8,
+            },
+            // 7XNN (add value to register VX)
+            0x7 => Self::AddToRegister {
+                register: (0xF00 & value) as usize >> 8,
+                value: (0xFF & value) as u8,
+            },
+            0x8 => Self::LogicalOperator {
+                operator: LogicalOperator::from(value),
+                register_x: (0x0F00 & value) as usize >> 8,
+                register_y: (0x00F0 & value) as usize >> 4,
+            },
+            0x9 => Self::SkipNotEqRegisters {
+                register_x: (value & 0x0F00) as usize >> 8,
+                register_y: (value & 0x00F0) as usize >> 4,
+            },
+            // ANNN (set index register I)
+            0xA => Self::SetIndexRegister(0xFFF & value),
+            // BNNN: Jump with offset
+            0xB => Self::JumpWithOffset {
+                register_x: (value & 0x0F00) as usize >> 8,
+                address: (value & 0x0FFF) as usize,
+            },
+            0xC => Self::Random {
+                register_x: (value & 0x0F00) as usize >> 8,
+                val_to_and: (value & 0x00FF) as u8,
+            },
+            // DXYN (display/draw)
+            0xD => Self::Draw {
+                x_register: (0xF00 & value) as usize >> 8,
+                y_register: (0xF0 & value) as usize >> 4,
+                height: (0xF & value) as u8,
+            },
+            0xE => Self::Unimplemented(value),
+            0xF => Self::FCommand {
+                register: (0xF00 & value) as usize >> 8,
+                command: FCommand::from(value),
+            },
+
+            _ => unreachable!(
+                "By bitshifting the value 12 to the right, we only have 4 bits, i.e. 0x0-0xF as insturctions"
+            ),
+        }
+    }
+}
 #[derive(Debug)]
 pub enum Instruction {
     // 00E0 (clear screen)

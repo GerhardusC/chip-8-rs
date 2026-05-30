@@ -1,4 +1,3 @@
-// NOTE: The test roms were found at https://github.com/Timendus/chip8-test-suite
 use std::{
     sync::{
         Arc,
@@ -6,8 +5,17 @@ use std::{
     },
     time::{Duration, UNIX_EPOCH},
 };
+// NOTE: The test roms were found at https://github.com/Timendus/chip8-test-suite
 
-use crate::{ApplicationError, Draw, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH, u8_to_arr};
+use crate::{
+    ApplicationError, Draw, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH,
+    emulator::{
+        instructions::Instruction,
+        logical_operator::{Direction, LogicalOperator},
+        sub_commands::FCommand,
+    },
+    u8_to_arr,
+};
 
 const FONT: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -48,253 +56,6 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     #[allow(unused)]
     input_provider: P,
     running_mode: RunningMode,
-}
-
-#[derive(Debug)]
-enum LogicalOperator {
-    // 8XY0: Set
-    // VX is set to the value of VY.
-    Set,
-    // 8XY1: Binary OR
-    // VX is set to the bitwise/binary logical disjunction (OR) of VX and VY. VY is not affected.
-    BinaryOr,
-    // 8XY2: Binary AND
-    // VX is set to the bitwise/binary logical conjunction (AND) of VX and VY. VY is not affected.
-    BinaryAnd,
-    // 8XY3: Logical XOR
-    // VX is set to the bitwise/binary exclusive OR (XOR) of VX and VY. VY is not affected.
-    LogicalXor,
-    // 8XY4: Add
-    // VX is set to the value of VX plus the value of VY. VY is not affected.
-    // Unlike 7XNN, this addition will affect the carry flag. If the result is larger than 255 (and thus overflows the 8-bit register VX), the flag register VF is set to 1. If it doesn’t overflow, VF is set to 0.
-    AddAffectingCarry,
-    // 8XY5 and 8XY7: Subtract
-    // These both subtract the value in one register from the other, and put the result in VX. In both cases, VY is not affected.
-    // 8XY5 sets VX to the result of VX - VY.
-    // This subtraction will also affect the carry flag, but note that it’s opposite from what you might think. If the minuend (the first operand) is larger than or equal to the subtrahend (second operand), VF will be set to 1. If the subtrahend is larger, and we “underflow” the result, VF is set to 0. Another way of thinking of it is that VF is set to 1 before the subtraction, and then the subtraction either borrows from VF (setting it to 0) or not.
-    Subtract,
-    // 8XY7 sets VX to the result of VY - VX.
-    SubtractReverse,
-    Shift(Direction),
-    Invalid,
-}
-
-#[derive(Debug)]
-enum Direction {
-    Left,
-    Right,
-}
-
-impl From<u16> for LogicalOperator {
-    fn from(value: u16) -> Self {
-        let relevant_byte = value & 0xF;
-        match relevant_byte {
-            0x0 => Self::Set,
-            0x1 => Self::BinaryOr,
-            0x2 => Self::BinaryAnd,
-            0x3 => Self::LogicalXor,
-            0x4 => Self::AddAffectingCarry,
-            0x5 => Self::Subtract,
-            0x6 | 0xE => Self::Shift(if relevant_byte == 0x6 {
-                Direction::Right
-            } else {
-                Direction::Left
-            }),
-            0x7 => Self::SubtractReverse,
-            _ => Self::Invalid,
-        }
-    }
-}
-
-#[derive(Debug)]
-enum Instruction {
-    // 00E0 (clear screen)
-    ClearScreen,
-    // 00EE (return)
-    Return,
-    // 2NNN (Subroutine)
-    Call(usize),
-    // 1NNN (jump)
-    Jump(u16),
-    // 6XNN (set register VX)
-    SetIndexRegister(u16),
-    // 7XNN (add value to register VX)
-    SetGeneralRegister {
-        register: usize,
-        value: u8,
-    },
-    // ANNN (set index register I)
-    AddToRegister {
-        register: usize,
-        value: u8,
-    },
-    // DXYN (display/draw)
-    Draw {
-        x_register: usize,
-        y_register: usize,
-        height: u8,
-    },
-    SkipEqValueWithRegisterContents {
-        register: usize,
-        value: u8,
-    },
-    SkipNotEqValueWithRegisterContents {
-        register: usize,
-        value: u8,
-    },
-    SkipEqRegisters {
-        register_x: usize,
-        register_y: usize,
-    },
-    SkipNotEqRegisters {
-        register_x: usize,
-        register_y: usize,
-    },
-    LogicalOperator {
-        operator: LogicalOperator,
-        register_x: usize,
-        register_y: usize,
-    },
-    JumpWithOffset {
-        register_x: usize,
-        address: usize,
-    },
-    Random {
-        register_x: usize,
-        val_to_and: u8,
-    },
-    FCommand {
-        register: usize,
-        command: FCommand,
-    },
-    #[allow(unused)]
-    Unimplemented(u16),
-    #[allow(unused)]
-    Error(u16),
-}
-
-#[derive(Debug)]
-enum FCommand {
-    // Timers
-    ReadDelayTimer,
-    SetDelayTimer,
-    SetSoundTimer,
-
-    // Aux
-    AddToIndexRegister,
-    GetFontCharacter,
-    DecimalConversion,
-
-    // Memory
-    StoreTo,
-    LoadFrom,
-
-    // Input
-    GetKey,
-
-    Unimplemented(u16),
-}
-
-impl From<u16> for FCommand {
-    fn from(value: u16) -> Self {
-        match value & 0xFF {
-            // Timers
-            0x07 => Self::ReadDelayTimer,
-            0x15 => Self::SetDelayTimer,
-            0x16 => Self::SetSoundTimer,
-
-            // Aux
-            0x1E => Self::AddToIndexRegister,
-            0x29 => Self::GetFontCharacter,
-            0x33 => Self::DecimalConversion,
-
-            // Memory
-            0x55 => Self::StoreTo,
-            0x65 => Self::LoadFrom,
-
-            // Input
-            0x0A => Self::GetKey,
-
-            _ => Self::Unimplemented(value),
-        }
-    }
-}
-
-impl From<u16> for Instruction {
-    fn from(value: u16) -> Self {
-        match value >> 12 {
-            // 00E0 (clear screen)
-            0x0 => {
-                if value == 0x00EE {
-                    Self::Return
-                } else if value == 0x00E0 {
-                    Self::ClearScreen
-                } else {
-                    Self::Unimplemented(value)
-                }
-            }
-            // 1NNN (jump)
-            0x1 => Self::Jump(0x0FFF & value),
-            0x2 => Self::Call((0x0FFF & value) as usize),
-            0x3 => Self::SkipEqValueWithRegisterContents {
-                register: (value & 0x0F00) as usize >> 8,
-                value: (value & 0x00FF) as u8,
-            },
-            0x4 => Self::SkipNotEqValueWithRegisterContents {
-                register: (value & 0x0F00) as usize >> 8,
-                value: (value & 0x00FF) as u8,
-            },
-            0x5 => Self::SkipEqRegisters {
-                register_x: (value & 0x0F00) as usize >> 8,
-                register_y: (value & 0x00F0) as usize >> 4,
-            },
-            // 6XNN (set register VX)
-            0x6 => Self::SetGeneralRegister {
-                register: (0xF00 & value) as usize >> 8,
-                value: (0xFF & value) as u8,
-            },
-            // 7XNN (add value to register VX)
-            0x7 => Self::AddToRegister {
-                register: (0xF00 & value) as usize >> 8,
-                value: (0xFF & value) as u8,
-            },
-            0x8 => Self::LogicalOperator {
-                operator: LogicalOperator::from(value),
-                register_x: (0x0F00 & value) as usize >> 8,
-                register_y: (0x00F0 & value) as usize >> 4,
-            },
-            0x9 => Self::SkipNotEqRegisters {
-                register_x: (value & 0x0F00) as usize >> 8,
-                register_y: (value & 0x00F0) as usize >> 4,
-            },
-            // ANNN (set index register I)
-            0xA => Self::SetIndexRegister(0xFFF & value),
-            // BNNN: Jump with offset
-            0xB => Self::JumpWithOffset {
-                register_x: (value & 0x0F00) as usize >> 8,
-                address: (value & 0x0FFF) as usize,
-            },
-            0xC => Self::Random {
-                register_x: (value & 0x0F00) as usize >> 8,
-                val_to_and: (value & 0x00FF) as u8,
-            },
-            // DXYN (display/draw)
-            0xD => Self::Draw {
-                x_register: (0xF00 & value) as usize >> 8,
-                y_register: (0xF0 & value) as usize >> 4,
-                height: (0xF & value) as u8,
-            },
-            0xE => Self::Unimplemented(value),
-            0xF => Self::FCommand {
-                register: (0xF00 & value) as usize >> 8,
-                command: FCommand::from(value),
-            },
-
-            _ => unreachable!(
-                "By bitshifting the value 12 to the right, we only have 4 bits, i.e. 0x0-0xF as insturctions"
-            ),
-        }
-    }
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
@@ -358,11 +119,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         let mask: u8 = 0b10000000 >> j;
                         if let Some(x) = self.screen_buffer.get_mut(current_loc as usize + j) {
                             let ans = mask & sprite;
-                            let tmp = if ans > 0 { 1 } else { 0 };
-                            if tmp == 1 && *x == tmp {
+                            if *x > 0 && ans > 0 {
+                                *x = 0;
                                 self.variable_registers[0xF] = 1;
-                            } else {
-                                *x = tmp;
+                            } else if *x == 0 && ans > 0 {
+                                self.variable_registers[0xF] = 1;
+                                *x = if ans > 0 { 1 } else { 0 };
                             }
                         }
                     }
