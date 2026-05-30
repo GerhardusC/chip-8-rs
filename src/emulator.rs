@@ -430,20 +430,20 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     LogicalOperator::AddAffectingCarry => {
                         let res = self.variable_registers[register_x] as u16
                             + self.variable_registers[register_y] as u16;
-                        self.variable_registers[0xF] = if res > 255 { 1 } else { 0 };
                         self.variable_registers[register_x] = (res & 0xFF) as u8;
+                        self.variable_registers[0xF] = if res > 255 { 1 } else { 0 };
                     }
                     LogicalOperator::Subtract => {
                         let res = self.variable_registers[register_x] as i16
                             - self.variable_registers[register_y] as i16;
-                        self.variable_registers[0xF] = if res > 0 { 1 } else { 0 };
                         self.variable_registers[register_x] = (res & 0xFF) as u8;
+                        self.variable_registers[0xF] = if res >= 0 { 1 } else { 0 };
                     }
                     LogicalOperator::SubtractReverse => {
                         let res = self.variable_registers[register_y] as i16
                             - self.variable_registers[register_x] as i16;
-                        self.variable_registers[0xF] = if res > 0 { 1 } else { 0 };
                         self.variable_registers[register_x] = (res & 0xFF) as u8;
+                        self.variable_registers[0xF] = if res >= 0 { 1 } else { 0 };
                     }
                     LogicalOperator::Shift(direction) => {
                         // TODO: Possible feature to optionally set VX to the value of VY
@@ -454,13 +454,13 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                                     self.variable_registers[register_y];
 
                                 let top = self.variable_registers[register_y] as u16;
+                                let res = self.variable_registers[register_y] << 1;
+                                self.variable_registers[register_x] = res;
                                 if top > 0 {
                                     self.variable_registers[0xF] = 1
                                 } else {
                                     self.variable_registers[0xF] = 0
                                 };
-                                let res = self.variable_registers[register_y] << 1;
-                                self.variable_registers[register_x] = res;
                             }
                             Direction::Right => {
                                 // NEXT LINE ONLY IN QUIRKS
@@ -468,13 +468,13 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                                     self.variable_registers[register_y];
 
                                 let bot = self.variable_registers[register_y] | 0b1;
+                                let res = self.variable_registers[register_y] >> 1;
+                                self.variable_registers[register_x] = res;
                                 if bot > 0 {
                                     self.variable_registers[0xF] = 1
                                 } else {
                                     self.variable_registers[0xF] = 0
                                 };
-                                let res = self.variable_registers[register_y] >> 1;
-                                self.variable_registers[register_x] = res;
                             }
                         }
                     }
@@ -549,7 +549,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         self.memory[self.index_register + i] = *reg;
                     }
                 }
-                FCommand::GetKey => {}
+                FCommand::GetKey => {
+                    todo!();
+                }
                 FCommand::Unimplemented(value) => {
                     eprintln!("COMMAND {value} UNIMPLEMENTED");
                 }
