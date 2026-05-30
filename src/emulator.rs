@@ -453,7 +453,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                                 self.variable_registers[register_x] =
                                     self.variable_registers[register_y];
 
-                                let top = self.variable_registers[register_y] as u16;
+                                let top = self.variable_registers[register_y] & 0b1000_0000;
                                 let res = self.variable_registers[register_y] << 1;
                                 self.variable_registers[register_x] = res;
                                 if top > 0 {
@@ -467,7 +467,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                                 self.variable_registers[register_x] =
                                     self.variable_registers[register_y];
 
-                                let bot = self.variable_registers[register_y] | 0b1;
+                                let bot = self.variable_registers[register_y] & 0b1;
                                 let res = self.variable_registers[register_y] >> 1;
                                 self.variable_registers[register_x] = res;
                                 if bot > 0 {
