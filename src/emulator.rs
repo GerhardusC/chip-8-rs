@@ -1,5 +1,8 @@
 use std::{
-    sync::atomic::AtomicU16,
+    sync::{
+        Arc,
+        atomic::{AtomicU16, Ordering},
+    },
     time::{Duration, UNIX_EPOCH},
 };
 
@@ -37,9 +40,9 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     index_register: usize,
     program_counter: usize,
     #[allow(unused)]
-    delay_timer: AtomicU16,
+    delay_timer: Arc<AtomicU16>,
     #[allow(unused)]
-    sound_timer: AtomicU16,
+    sound_timer: Arc<AtomicU16>,
     drawer: T,
     #[allow(unused)]
     input_provider: P,
@@ -83,15 +86,15 @@ enum Direction {
 
 impl From<u16> for LogicalOperator {
     fn from(value: u16) -> Self {
-        let bit = value & 0xF;
-        match bit {
+        let relevant_byte = value & 0xF;
+        match relevant_byte {
             0x0 => Self::Set,
             0x1 => Self::BinaryOr,
             0x2 => Self::BinaryAnd,
             0x3 => Self::LogicalXor,
             0x4 => Self::AddAffectingCarry,
             0x5 => Self::Subtract,
-            0x6 | 0xE => Self::Shift(if value == 0x6 {
+            0x6 | 0xE => Self::Shift(if relevant_byte == 0x6 {
                 Direction::Right
             } else {
                 Direction::Left
@@ -159,10 +162,61 @@ enum Instruction {
         register_x: usize,
         val_to_and: u8,
     },
+    FCommand {
+        register: usize,
+        command: FCommand,
+    },
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]
     Error(u16),
+}
+
+#[derive(Debug)]
+enum FCommand {
+    // Timers
+    ReadDelayTimer,
+    SetDelayTimer,
+    SetSoundTimer,
+
+    // Aux
+    AddToIndexRegister,
+    GetFontCharacter,
+    DecimalConversion,
+
+    // Memory
+    StoreTo,
+    LoadFrom,
+
+    // Input
+    GetKey,
+
+    Unimplemented(u16),
+}
+
+impl From<u16> for FCommand {
+    fn from(value: u16) -> Self {
+        match value & 0xFF {
+            // Timers
+            0x07 => Self::ReadDelayTimer,
+            0x15 => Self::SetDelayTimer,
+            0x16 => Self::SetSoundTimer,
+
+            // Aux
+            0x1E => Self::AddToIndexRegister,
+            0x29 => Self::GetFontCharacter,
+            0x33 => Self::DecimalConversion,
+
+            // Memory
+            0x55 => Self::StoreTo,
+            0x65 => Self::LoadFrom,
+
+            // Input
+            0x0A => Self::GetKey,
+
+            _ => Self::Unimplemented(value),
+        }
+    }
 }
 
 impl From<u16> for Instruction {
@@ -230,7 +284,10 @@ impl From<u16> for Instruction {
                 height: (0xF & value) as u8,
             },
             0xE => Self::Unimplemented(value),
-            0xF => Self::Unimplemented(value),
+            0xF => Self::FCommand {
+                register: (0xF00 & value) as usize >> 8,
+                command: FCommand::from(value),
+            },
 
             _ => unreachable!(
                 "By bitshifting the value 12 to the right, we only have 4 bits, i.e. 0x0-0xF as insturctions"
@@ -250,8 +307,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             font_addr: 0x50,
             index_register: 0,
             program_counter: 0x200,
-            delay_timer: AtomicU16::new(0),
-            sound_timer: AtomicU16::new(0),
+            delay_timer: Arc::new(AtomicU16::new(0)),
+            sound_timer: Arc::new(AtomicU16::new(0)),
             drawer: T::init(),
             running_mode,
             input_provider: P::init(),
@@ -450,6 +507,46 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.stack.push(self.program_counter);
                 self.program_counter = memory_addr;
             }
+            Instruction::FCommand { register, command } => match command {
+                FCommand::ReadDelayTimer => {
+                    self.variable_registers[register] =
+                        self.delay_timer.load(Ordering::Relaxed) as u8;
+                }
+                FCommand::SetDelayTimer => {
+                    self.delay_timer
+                        .store(self.variable_registers[register] as u16, Ordering::Relaxed);
+                }
+                FCommand::SetSoundTimer => {
+                    self.sound_timer
+                        .store(self.variable_registers[register] as u16, Ordering::Relaxed);
+                }
+                FCommand::AddToIndexRegister => {
+                    self.index_register += self.variable_registers[register] as usize;
+                }
+                FCommand::GetFontCharacter => {
+                    self.index_register =
+                        self.font_addr + self.variable_registers[register] as usize;
+                }
+                FCommand::DecimalConversion => {}
+                FCommand::LoadFrom => {
+                    for (i, reg) in self.memory
+                        [self.index_register..=(self.index_register + register)]
+                        .iter()
+                        .enumerate()
+                    {
+                        self.variable_registers[i] = *reg;
+                    }
+                }
+                FCommand::StoreTo => {
+                    for (i, reg) in self.variable_registers[0..=register].iter().enumerate() {
+                        self.memory[self.index_register + i] = *reg;
+                    }
+                }
+                FCommand::GetKey => {}
+                FCommand::Unimplemented(value) => {
+                    eprintln!("COMMAND {value} UNIMPLEMENTED");
+                }
+            },
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
         }
@@ -487,9 +584,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         dbg!(&instruction);
                         self.execute(instruction);
 
-                        // Always just show the stack, its small enough
-
-                        // CMP with prev state and update prev state
                         let index_register = self.index_register;
                         if prev_index_register != index_register {
                             dbg!(&index_register);
@@ -507,7 +601,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         }
                         let memory = format!("{:?}", self.memory);
                         if prev_memory != memory {
-                            dbg!("Memory updated");
+                            println!("Memory updated");
                             prev_memory = memory;
                         }
                         let varaible_registers = format!("{:?}", self.variable_registers);
@@ -526,7 +620,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         let Ok(_) = std::io::stdin().read_line(&mut res) else {
                             break;
                         };
-                        if res.trim() == "n" {
+                        if res.trim() != "q" {
                             continue;
                         } else {
                             break;
@@ -535,7 +629,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 }
                 RunningMode::Normal => loop {
                     let instruction = self.fetch();
-                    // TODO: Take input here
                     self.execute(instruction);
                     std::thread::sleep(Duration::from_millis(6));
                 },

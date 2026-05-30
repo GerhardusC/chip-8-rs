@@ -11,7 +11,6 @@ impl Draw for DebugDrawer {
         let x = screen_buf
             .chunks(64)
             .map(|s| s.iter().map(|c| if *c == 0 { ' ' } else { '█' }).collect())
-            // .map(|s| format!("{:?}", s))
             .collect::<Vec<String>>()
             .join("\n");
         println!("Call to draw_buffer:\n{}", x);
