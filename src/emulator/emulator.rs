@@ -1,3 +1,4 @@
+// NOTE: The test roms were found at https://github.com/Timendus/chip8-test-suite
 use std::{
     sync::{
         Arc,
