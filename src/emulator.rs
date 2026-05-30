@@ -6,7 +6,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
-use crate::{ApplicationError, Draw, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::{ApplicationError, Draw, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH, u8_to_arr};
 
 const FONT: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -527,7 +527,14 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     self.index_register =
                         self.font_addr + self.variable_registers[register] as usize;
                 }
-                FCommand::DecimalConversion => {}
+                FCommand::DecimalConversion => {
+                    let val = self.variable_registers[register];
+                    let val = u8_to_arr(val);
+
+                    for (i, val) in val.iter().enumerate() {
+                        self.memory[self.index_register + i] = *val;
+                    }
+                }
                 FCommand::LoadFrom => {
                     for (i, reg) in self.memory
                         [self.index_register..=(self.index_register + register)]
