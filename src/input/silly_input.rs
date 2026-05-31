@@ -49,7 +49,7 @@ unsafe extern "C" {
 
 pub fn convert_keymap(max_delay: Duration, key_map: &HashMap<char, SystemTime>) -> [u8; 16] {
     let mut res = [
-        b'1', b'2', b'3', b'4', b'q', b'w', b'e', b'r', b'a', b's', b'd', b'f', b'z', b'x', b'c',
+        b'x', b'1', b'2', b'3', b'q', b'w', b'e', b'a', b's', b'd', b'z', b'c', b'4', b'r', b'f',
         b'v',
     ];
     let now = SystemTime::now();
@@ -103,7 +103,7 @@ impl ReadInputState for InputListener {
 
     fn read_keys_state(&self) -> Result<[u8; 16], String> {
         if let Ok(x) = self.keys.read() {
-            Ok(convert_keymap(Duration::from_millis(100), &x))
+            Ok(convert_keymap(Duration::from_millis(300), &x))
         } else {
             Err("Failed to read keys state".to_string())
         }

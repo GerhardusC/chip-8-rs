@@ -10,7 +10,7 @@ use std::{
 use crate::{
     ApplicationError, Draw, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH,
     emulator::{
-        instructions::Instruction,
+        instructions::{Instruction, KeyStateToCheck},
         logical_operator::{Direction, LogicalOperator},
         sub_commands::FCommand,
     },
@@ -41,8 +41,6 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     // TODO: Check if stack pointer needs to exist
     #[allow(unused)]
     stack: Vec<usize>,
-    #[allow(unused)]
-    keys: [u8; 16],
     variable_registers: [u8; 16],
     screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
     font_addr: usize,
@@ -53,7 +51,6 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     #[allow(unused)]
     sound_timer: Arc<AtomicU16>,
     drawer: T,
-    #[allow(unused)]
     input_provider: P,
     running_mode: RunningMode,
 }
@@ -63,7 +60,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         let mut emulator = Self {
             memory: [0; 0x1000],
             stack: vec![],
-            keys: [0; 16],
             variable_registers: [0; 16],
             screen_buffer: [0; SCREEN_WIDTH * SCREEN_HEIGHT],
             font_addr: 0x50,
@@ -96,6 +92,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     fn execute(&mut self, instruction: Instruction) {
         match instruction {
             Instruction::ClearScreen => {
+                for i in self.screen_buffer.iter_mut() {
+                    *i = 0;
+                }
                 self.drawer.clear_screen();
             }
             Instruction::Draw {
@@ -313,12 +312,52 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     }
                 }
                 FCommand::GetKey => {
-                    todo!();
+                    if let Ok(keys) = self.input_provider.read_keys_state() {
+                        let mut key_pressed = false;
+                        for (i, key) in keys.iter().enumerate() {
+                            if *key > 0 {
+                                self.variable_registers[register] = i as u8;
+                                key_pressed = true;
+                                break;
+                            }
+                        }
+
+                        // A note here, because the article suggested immediately
+                        // incrementing the program counter earlier, we have to
+                        // decrement it again here.
+                        if !key_pressed {
+                            self.program_counter -= 2;
+                        };
+                    }
                 }
                 FCommand::Unimplemented(value) => {
                     eprintln!("COMMAND {value} UNIMPLEMENTED");
                 }
             },
+            Instruction::SkipIfKey {
+                register,
+                state_to_check,
+            } => {
+                if let Ok(keys) = self.input_provider.read_keys_state() {
+                    let current_key_state =
+                        keys[(self.variable_registers[register] & 0xF) as usize];
+                    match state_to_check {
+                        KeyStateToCheck::IsPressed => {
+                            if current_key_state > 0 {
+                                self.program_counter += 2;
+                            }
+                        }
+                        KeyStateToCheck::NotPressed => {
+                            if current_key_state == 0 {
+                                self.program_counter += 2;
+                            }
+                        }
+                        KeyStateToCheck::Invalid => {
+                            eprintln!("Unrecognised instruction.")
+                        }
+                    }
+                };
+            }
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
         }
@@ -402,7 +441,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 RunningMode::Normal => loop {
                     let instruction = self.fetch();
                     self.execute(instruction);
-                    std::thread::sleep(Duration::from_millis(6));
+                    std::thread::sleep(Duration::from_millis(1));
                 },
             };
         });

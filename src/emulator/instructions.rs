@@ -64,7 +64,14 @@ impl From<u16> for Instruction {
                 y_register: (0xF0 & value) as usize >> 4,
                 height: (0xF & value) as u8,
             },
-            0xE => Self::Unimplemented(value),
+            0xE => Self::SkipIfKey {
+                register: (0xF00 & value) as usize >> 8,
+                state_to_check: match 0xFF & value {
+                    0x9E => KeyStateToCheck::IsPressed,
+                    0xA1 => KeyStateToCheck::NotPressed,
+                    _ => KeyStateToCheck::Invalid,
+                },
+            },
             0xF => Self::FCommand {
                 register: (0xF00 & value) as usize >> 8,
                 command: FCommand::from(value),
@@ -137,8 +144,19 @@ pub enum Instruction {
         register: usize,
         command: FCommand,
     },
+    SkipIfKey {
+        register: usize,
+        state_to_check: KeyStateToCheck,
+    },
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]
     Error(u16),
+}
+
+#[derive(Debug)]
+pub enum KeyStateToCheck {
+    IsPressed,
+    NotPressed,
+    Invalid,
 }
