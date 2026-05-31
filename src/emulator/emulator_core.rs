@@ -327,7 +327,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     self.input_provider.reset_keys_state();
                 }
                 FCommand::Unimplemented(value) => {
-                    eprintln!("COMMAND {value} UNIMPLEMENTED");
+                    if let RunningMode::Debug = self.running_mode {
+                        eprintln!("COMMAND {value} UNIMPLEMENTED");
+                    }
                 }
             },
             Instruction::SkipIfKey {
@@ -349,7 +351,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                             }
                         }
                         KeyStateToCheck::Invalid => {
-                            eprintln!("Unrecognised instruction.")
+                            if let RunningMode::Debug = self.running_mode {
+                                eprintln!("Unrecognised instruction.")
+                            }
                         }
                     }
                 };

@@ -103,7 +103,7 @@ impl ReadInputState for InputListener {
 
     fn read_keys_state(&self) -> Result<[u8; 16], String> {
         if let Ok(x) = self.keys.read() {
-            Ok(convert_keymap(Duration::from_millis(300), &x))
+            Ok(convert_keymap(Duration::from_millis(50), &x))
         } else {
             Err("Failed to read keys state".to_string())
         }
