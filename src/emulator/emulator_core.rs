@@ -39,16 +39,13 @@ const FONT: [u8; 80] = [
 pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
     // TODO: Check if stack pointer needs to exist
-    #[allow(unused)]
     stack: Vec<usize>,
     variable_registers: [u8; 16],
     screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
     font_addr: usize,
     index_register: usize,
     program_counter: usize,
-    #[allow(unused)]
     delay_timer: Arc<AtomicU16>,
-    #[allow(unused)]
     sound_timer: Arc<AtomicU16>,
     drawer: T,
     input_provider: P,
@@ -312,23 +309,22 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     }
                 }
                 FCommand::GetKey => {
-                    if let Ok(keys) = self.input_provider.read_keys_state() {
+                    loop {
                         let mut key_pressed = false;
-                        for (i, key) in keys.iter().enumerate() {
-                            if *key > 0 {
-                                self.variable_registers[register] = i as u8;
-                                key_pressed = true;
-                                break;
+                        if let Ok(keys) = self.input_provider.read_keys_state() {
+                            for (i, key) in keys.iter().enumerate() {
+                                if *key > 0 {
+                                    self.variable_registers[register] = i as u8;
+                                    key_pressed = true;
+                                    break;
+                                }
                             }
                         }
-
-                        // A note here, because the article suggested immediately
-                        // incrementing the program counter earlier, we have to
-                        // decrement it again here.
-                        if !key_pressed {
-                            self.program_counter -= 2;
+                        if key_pressed {
+                            break;
                         };
                     }
+                    self.input_provider.reset_keys_state();
                 }
                 FCommand::Unimplemented(value) => {
                     eprintln!("COMMAND {value} UNIMPLEMENTED");
@@ -378,73 +374,85 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     }
 
     pub fn run(mut self) {
-        let _delay_timer = &self.delay_timer;
-        let _sound_timer = &self.sound_timer;
-        std::thread::scope(|_s| {
-            match self.running_mode {
-                RunningMode::Debug => {
-                    let mut prev_index_register = self.index_register;
-                    let mut prev_program_counter = self.program_counter;
-                    let mut prev_stack = format!("{:?}", self.stack);
-                    let mut prev_memory = format!("{:?}", self.memory);
-                    let mut prev_varaible_registers = format!("{:?}", self.variable_registers);
-                    let mut prev_screen_buffer = format!("{:?}", self.screen_buffer);
+        let delay_timer = self.delay_timer.clone();
+        let sound_timer = self.sound_timer.clone();
+        std::thread::spawn(move || {
+            loop {
+                let old_val = delay_timer.load(Ordering::Relaxed);
+                if old_val > 0 {
+                    delay_timer.store(old_val - 1, Ordering::Relaxed);
+                }
 
-                    loop {
-                        let instruction = self.fetch();
-                        dbg!(&instruction);
-                        self.execute(instruction);
+                let old_val = sound_timer.load(Ordering::Relaxed);
+                if old_val > 0 {
+                    sound_timer.store(old_val - 1, Ordering::Relaxed);
+                }
+                std::thread::sleep(Duration::from_millis(6));
+            }
+        });
+        match self.running_mode {
+            RunningMode::Debug => {
+                let mut prev_index_register = self.index_register;
+                let mut prev_program_counter = self.program_counter;
+                let mut prev_stack = format!("{:?}", self.stack);
+                let mut prev_memory = format!("{:?}", self.memory);
+                let mut prev_varaible_registers = format!("{:?}", self.variable_registers);
+                let mut prev_screen_buffer = format!("{:?}", self.screen_buffer);
 
-                        let index_register = self.index_register;
-                        if prev_index_register != index_register {
-                            dbg!(&index_register);
-                            prev_index_register = index_register;
-                        }
-                        let program_counter = self.program_counter;
-                        if prev_program_counter != program_counter {
-                            dbg!(&program_counter);
-                            prev_program_counter = program_counter;
-                        }
-                        let stack = format!("{:?}", &self.stack);
-                        if prev_stack != stack {
-                            dbg!(&stack);
-                            prev_stack = stack;
-                        }
-                        let memory = format!("{:?}", self.memory);
-                        if prev_memory != memory {
-                            println!("Memory updated");
-                            prev_memory = memory;
-                        }
-                        let varaible_registers = format!("{:?}", self.variable_registers);
-                        if prev_varaible_registers != varaible_registers {
-                            dbg!(&varaible_registers);
-                            prev_varaible_registers = varaible_registers;
-                        }
-                        let screen_buffer = format!("{:?}", self.screen_buffer);
-                        if prev_screen_buffer != screen_buffer {
-                            dbg!("Screen_updated");
-                            prev_screen_buffer = screen_buffer;
-                        }
+                loop {
+                    let instruction = self.fetch();
+                    dbg!(&instruction);
+                    self.execute(instruction);
 
-                        println!("Next instruction: 'n'");
-                        let mut res = String::new();
-                        let Ok(_) = std::io::stdin().read_line(&mut res) else {
-                            break;
-                        };
-                        if res.trim() != "q" {
-                            continue;
-                        } else {
-                            break;
-                        }
+                    let index_register = self.index_register;
+                    if prev_index_register != index_register {
+                        dbg!(&index_register);
+                        prev_index_register = index_register;
+                    }
+                    let program_counter = self.program_counter;
+                    if prev_program_counter != program_counter {
+                        dbg!(&program_counter);
+                        prev_program_counter = program_counter;
+                    }
+                    let stack = format!("{:?}", &self.stack);
+                    if prev_stack != stack {
+                        dbg!(&stack);
+                        prev_stack = stack;
+                    }
+                    let memory = format!("{:?}", self.memory);
+                    if prev_memory != memory {
+                        println!("Memory updated");
+                        prev_memory = memory;
+                    }
+                    let varaible_registers = format!("{:?}", self.variable_registers);
+                    if prev_varaible_registers != varaible_registers {
+                        dbg!(&varaible_registers);
+                        prev_varaible_registers = varaible_registers;
+                    }
+                    let screen_buffer = format!("{:?}", self.screen_buffer);
+                    if prev_screen_buffer != screen_buffer {
+                        dbg!("Screen_updated");
+                        prev_screen_buffer = screen_buffer;
+                    }
+
+                    println!("Next instruction: 'n'");
+                    let mut res = String::new();
+                    let Ok(_) = std::io::stdin().read_line(&mut res) else {
+                        break;
+                    };
+                    if res.trim() != "q" {
+                        continue;
+                    } else {
+                        break;
                     }
                 }
-                RunningMode::Normal => loop {
-                    let instruction = self.fetch();
-                    self.execute(instruction);
-                    std::thread::sleep(Duration::from_millis(1));
-                },
-            };
-        });
+            }
+            RunningMode::Normal => loop {
+                let instruction = self.fetch();
+                self.execute(instruction);
+                std::thread::sleep(Duration::from_millis(1));
+            },
+        };
     }
 }
 

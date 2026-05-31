@@ -23,6 +23,7 @@ pub trait Draw {
 pub trait ReadInputState {
     fn init() -> Self;
     fn read_keys_state(&self) -> Result<[u8; 16], String>;
+    fn reset_keys_state(&mut self);
 }
 
 #[derive(Debug)]

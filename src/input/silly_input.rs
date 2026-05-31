@@ -108,6 +108,12 @@ impl ReadInputState for InputListener {
             Err("Failed to read keys state".to_string())
         }
     }
+
+    fn reset_keys_state(&mut self) {
+        if let Ok(mut keys) = self.keys.write() {
+            keys.clear();
+        }
+    }
 }
 
 impl InputListener {
