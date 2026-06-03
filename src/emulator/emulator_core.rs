@@ -488,7 +488,19 @@ pub enum RunningMode {
 
 #[cfg(test)]
 mod tests {
-    use crate::{DebugDrawer, DummyInput};
+    struct DummyInput;
+    struct DebugDrawer;
+    impl Draw for DebugDrawer {
+        fn init() -> Self { Self }
+        fn draw_buffer(&self, _screen_buf: &[u8]) {}
+        fn return_home(&self) {}
+        fn clear_screen(&self) {}
+    }
+    impl ReadInputState for DummyInput {
+        fn init() -> Self { Self }
+        fn read_keys_state(&self) -> Result<[u8; 16], String> {Ok([0; 16])}
+        fn reset_keys_state(&mut self) {}
+    }
 
     use super::*;
 

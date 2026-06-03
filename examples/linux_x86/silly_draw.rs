@@ -1,6 +1,5 @@
 use std::io::Write;
-
-use crate::{Draw, SCREEN_HEIGHT, SCREEN_WIDTH};
+use chip_eight::{Draw, SCREEN_HEIGHT, SCREEN_WIDTH};
 
 pub struct Drawer;
 

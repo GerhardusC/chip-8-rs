@@ -1,13 +1,9 @@
 use std::{error::Error, fmt::Display};
 
-mod drawing;
 mod emulator;
-mod input;
 mod utils;
 
-pub use drawing::*;
 pub use emulator::*;
-pub use input::*;
 pub use utils::*;
 
 pub const SCREEN_WIDTH: usize = 64;

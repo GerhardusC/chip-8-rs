@@ -1,4 +1,4 @@
-use crate::Draw;
+use chip_eight::Draw;
 
 pub struct DebugDrawer;
 
