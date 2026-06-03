@@ -16,10 +16,6 @@ impl Draw for DebugDrawer {
         println!("Call to draw_buffer:\n{}", x);
     }
 
-    fn return_home(&self) {
-        dbg!("Call to return home draw_buffer");
-    }
-
     fn clear_screen(&self) {
         dbg!("Call to clear screen");
     }

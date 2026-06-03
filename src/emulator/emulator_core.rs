@@ -36,6 +36,7 @@ const FONT: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
+#[derive(Debug)]
 pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
     // TODO: Check if stack pointer needs to exist
@@ -481,6 +482,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     }
 }
 
+#[derive(Debug)]
 pub enum RunningMode {
     Debug,
     Normal,
@@ -495,7 +497,6 @@ mod tests {
             Self
         }
         fn draw_buffer(&self, _screen_buf: &[u8]) {}
-        fn return_home(&self) {}
         fn clear_screen(&self) {}
     }
     impl ReadInputState for DummyInput {

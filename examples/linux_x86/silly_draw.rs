@@ -3,6 +3,13 @@ use std::io::Write;
 
 pub struct Drawer;
 
+impl Drawer {
+    fn return_home(&self) {
+        print!("\x1b[H");
+        let _ = std::io::stdout().flush();
+    }
+}
+
 impl Draw for Drawer {
     fn init() -> Self {
         println!("\x1b[?1049h");
@@ -14,11 +21,6 @@ impl Draw for Drawer {
     fn draw_buffer(&self, screen_buf: &[u8]) {
         println!("{}", create_buffer_string(screen_buf, SCREEN_WIDTH));
         self.return_home();
-    }
-
-    fn return_home(&self) {
-        print!("\x1b[H");
-        let _ = std::io::stdout().flush();
     }
 
     fn clear_screen(&self) {

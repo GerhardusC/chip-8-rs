@@ -12,7 +12,6 @@ pub const SCREEN_HEIGHT: usize = 32;
 pub trait Draw {
     fn init() -> Self;
     fn draw_buffer(&self, screen_buf: &[u8]);
-    fn return_home(&self);
     fn clear_screen(&self);
 }
 
