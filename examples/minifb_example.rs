@@ -9,6 +9,39 @@ use std::{
 use chip_eight::{Draw, Emulator, ReadInputState, SCREEN_WIDTH};
 use minifb::{Window, WindowOptions};
 
+// The emulator needs a handle to drawing to the screen, and one for reading user input. For better
+// or worse, I have decided to implement them as traits that need to be implemented for types
+// passed to the emulator.
+//
+// In this implementation is not particularly great or fancy, but it illustrates how the emulator
+// will call the requird drawing functions and respond to them.
+impl Draw for &App {
+    fn draw_buffer(&mut self, screen_buf: &[u8]) {
+        let _ = self.sender.send(screen_buf.to_vec());
+    }
+
+    fn clear_screen(&mut self) {
+        let _ = self.sender.send(vec![0; 640 * 320]);
+    }
+}
+
+impl ReadInputState for &App {
+    fn read_keys_state(&self) -> Result<[u8; 16], String> {
+        if let Ok(keys) = self.keys.lock() {
+            Ok(*keys)
+        } else {
+            Err("Mutext lock error".to_owned())
+        }
+    }
+
+    fn reset_keys_state(&mut self) {
+        let new_keys = [0; 16];
+        if let Ok(mut keys) = self.keys.lock() {
+            *keys = new_keys;
+        }
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let (tx, rx) = mpsc::channel::<Vec<u8>>();
     let keys = Arc::new(Mutex::new([0; 16]));
@@ -40,10 +73,10 @@ cargo run --example minifb_example /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
-    let emulator = Emulator::init(program, chip_eight::RunningMode::Normal, &app, &app)?;
-
     std::thread::spawn(move || {
-        let mut window = Window::new("Hello window", 640, 320, WindowOptions::default()).unwrap();
+        let mut window = Window::new("Minifb Chip 8 Example", 640, 320, WindowOptions::default())
+            .expect("Failed to create window");
+
         while window.is_open() {
             if let Ok(msg) = rx.try_recv() {
                 let buffer = expand_buffer(&msg, 10, SCREEN_WIDTH);
@@ -79,6 +112,7 @@ cargo run --example minifb_example /path/to/chip8/program.c8
         }
     });
 
+    let emulator = Emulator::init(program, chip_eight::RunningMode::Normal, &app, &app)?;
     emulator.run();
 
     Ok(())
@@ -89,33 +123,9 @@ struct App {
     keys: Arc<Mutex<[u8; 16]>>,
 }
 
-impl Draw for &App {
-    fn draw_buffer(&mut self, screen_buf: &[u8]) {
-        let _ = self.sender.send(screen_buf.to_vec());
-    }
-
-    fn clear_screen(&mut self) {
-        let _ = self.sender.send(vec![0; 640 * 320]);
-    }
-}
-
-impl ReadInputState for &App {
-    fn read_keys_state(&self) -> Result<[u8; 16], String> {
-        if let Ok(keys) = self.keys.lock() {
-            Ok(*keys)
-        } else {
-            Err("Mutext lock error".to_owned())
-        }
-    }
-
-    fn reset_keys_state(&mut self) {
-        let new_keys = [0; 16];
-        if let Ok(mut keys) = self.keys.lock() {
-            *keys = new_keys;
-        }
-    }
-}
-
+// Really, not the most efficient function, but whatever, I just want to grow pixels by a factor
+// and convert 1's to a pixel color and 0's to no pixel color (illustrated by th unit test
+// 'it_can_expand_buffer'
 fn expand_buffer(buf: &[u8], factor: u8, screen_width: usize) -> Vec<u32> {
     let mut output = vec![];
 
@@ -140,11 +150,17 @@ mod tests {
 
     #[test]
     fn it_can_expand_buffer() {
-        let input = [1, 0, 0, 1];
+        #[rustfmt::skip]
+        let input = [
+            1, 0,
+            0, 1
+        ];
+        #[rustfmt::skip]
         let expected = vec![
-            0xFFFFFF00, 0xFFFFFF00, 0x00000000, 0x00000000, 0xFFFFFF00, 0xFFFFFF00, 0x00000000,
-            0x00000000, 0x00000000, 0x00000000, 0xFFFFFF00, 0xFFFFFF00, 0x00000000, 0x00000000,
-            0xFFFFFF00, 0xFFFFFF00,
+            0xFFFFFF00, 0xFFFFFF00, 0x00000000, 0x00000000,
+            0xFFFFFF00, 0xFFFFFF00, 0x00000000, 0x00000000,
+            0x00000000, 0x00000000, 0xFFFFFF00, 0xFFFFFF00,
+            0x00000000, 0x00000000, 0xFFFFFF00, 0xFFFFFF00,
         ];
 
         let output = expand_buffer(&input, 2, 2);
