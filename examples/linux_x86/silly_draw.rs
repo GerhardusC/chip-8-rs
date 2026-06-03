@@ -17,12 +17,12 @@ impl Drawer {
 }
 
 impl Draw for Drawer {
-    fn draw_buffer(&self, screen_buf: &[u8]) {
+    fn draw_buffer(&mut self, screen_buf: &[u8]) {
         println!("{}", create_buffer_string(screen_buf, SCREEN_WIDTH));
         self.return_home();
     }
 
-    fn clear_screen(&self) {
+    fn clear_screen(&mut self) {
         self.return_home();
         let x = (" ".repeat(SCREEN_WIDTH * 5) + "\n").repeat(SCREEN_HEIGHT * 5);
 

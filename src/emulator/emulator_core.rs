@@ -498,8 +498,8 @@ mod tests {
     struct DummyInput;
     struct DebugDrawer;
     impl Draw for DebugDrawer {
-        fn draw_buffer(&self, _screen_buf: &[u8]) {}
-        fn clear_screen(&self) {}
+        fn draw_buffer(&mut self, _screen_buf: &[u8]) {}
+        fn clear_screen(&mut self) {}
     }
     impl ReadInputState for DummyInput {
         fn read_keys_state(&self) -> Result<[u8; 16], String> {
