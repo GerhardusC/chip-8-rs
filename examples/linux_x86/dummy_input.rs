@@ -1,10 +1,6 @@
 use crate::ReadInputState;
 
 impl ReadInputState for DummyInput {
-    fn init() -> Self {
-        Self
-    }
-
     fn read_keys_state(&self) -> Result<[u8; 16], String> {
         Ok([0; 16])
     }

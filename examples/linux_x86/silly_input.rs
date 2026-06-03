@@ -77,7 +77,23 @@ pub struct InputListener {
 }
 
 impl ReadInputState for InputListener {
-    fn init() -> Self {
+    fn read_keys_state(&self) -> Result<[u8; 16], String> {
+        if let Ok(x) = self.keys.read() {
+            Ok(convert_keymap(Duration::from_millis(50), &x))
+        } else {
+            Err("Failed to read keys state".to_string())
+        }
+    }
+
+    fn reset_keys_state(&mut self) {
+        if let Ok(mut keys) = self.keys.write() {
+            keys.clear();
+        }
+    }
+}
+
+impl InputListener {
+    pub fn init() -> Self {
         let mut original = unsafe { std::mem::zeroed() };
 
         unsafe {
@@ -101,22 +117,6 @@ impl ReadInputState for InputListener {
         listener
     }
 
-    fn read_keys_state(&self) -> Result<[u8; 16], String> {
-        if let Ok(x) = self.keys.read() {
-            Ok(convert_keymap(Duration::from_millis(50), &x))
-        } else {
-            Err("Failed to read keys state".to_string())
-        }
-    }
-
-    fn reset_keys_state(&mut self) {
-        if let Ok(mut keys) = self.keys.write() {
-            keys.clear();
-        }
-    }
-}
-
-impl InputListener {
     fn listen(&mut self) -> Result<(), Box<dyn Error>> {
         let mut stdin = std::io::stdin();
 

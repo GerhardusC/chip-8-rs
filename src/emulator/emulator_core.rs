@@ -54,7 +54,12 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
-    pub fn init(program: Vec<u8>, running_mode: RunningMode) -> Result<Self, ApplicationError> {
+    pub fn init(
+        program: Vec<u8>,
+        running_mode: RunningMode,
+        drawer: T,
+        input_provider: P,
+    ) -> Result<Self, ApplicationError> {
         let mut emulator = Self {
             memory: [0; 0x1000],
             stack: vec![],
@@ -65,9 +70,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             program_counter: 0x200,
             delay_timer: Arc::new(AtomicU16::new(0)),
             sound_timer: Arc::new(AtomicU16::new(0)),
-            drawer: T::init(),
+            drawer,
             running_mode,
-            input_provider: P::init(),
+            input_provider,
         };
 
         emulator.set_mem_block(&program, 0x200)?;
@@ -493,16 +498,10 @@ mod tests {
     struct DummyInput;
     struct DebugDrawer;
     impl Draw for DebugDrawer {
-        fn init() -> Self {
-            Self
-        }
         fn draw_buffer(&self, _screen_buf: &[u8]) {}
         fn clear_screen(&self) {}
     }
     impl ReadInputState for DummyInput {
-        fn init() -> Self {
-            Self
-        }
         fn read_keys_state(&self) -> Result<[u8; 16], String> {
             Ok([0; 16])
         }
@@ -513,8 +512,13 @@ mod tests {
 
     #[test]
     fn it_can_fetch_an_instruction() {
-        let mut emulator = Emulator::<DebugDrawer, DummyInput>::init(vec![], RunningMode::Normal)
-            .expect("All initial memory is in range");
+        let mut emulator = Emulator::<DebugDrawer, DummyInput>::init(
+            vec![],
+            RunningMode::Normal,
+            DebugDrawer,
+            DummyInput,
+        )
+        .expect("All initial memory is in range");
 
         emulator
             .set_font(&FONT)

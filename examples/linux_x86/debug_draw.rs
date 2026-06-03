@@ -3,10 +3,6 @@ use chip_eight::Draw;
 pub struct DebugDrawer;
 
 impl Draw for DebugDrawer {
-    fn init() -> Self {
-        Self
-    }
-
     fn draw_buffer(&self, screen_buf: &[u8]) {
         let x = screen_buf
             .chunks(64)

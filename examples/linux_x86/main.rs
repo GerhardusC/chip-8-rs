@@ -63,11 +63,13 @@ Example:
 
     match running_mode {
         RunningMode::Debug => {
-            let emulator: Emulator<DebugDrawer, DummyInput> = Emulator::init(input, running_mode)?;
+            let emulator: Emulator<DebugDrawer, DummyInput> =
+                Emulator::init(input, running_mode, DebugDrawer, DummyInput)?;
             emulator.run();
         }
         RunningMode::Normal => {
-            let emulator: Emulator<Drawer, InputListener> = Emulator::init(input, running_mode)?;
+            let emulator: Emulator<Drawer, InputListener> =
+                Emulator::init(input, running_mode, Drawer::init(), InputListener::init())?;
             emulator.run();
         }
     }

@@ -8,16 +8,15 @@ impl Drawer {
         print!("\x1b[H");
         let _ = std::io::stdout().flush();
     }
-}
-
-impl Draw for Drawer {
-    fn init() -> Self {
+    pub fn init() -> Self {
         println!("\x1b[?1049h");
         let x = Self;
         x.return_home();
         x
     }
+}
 
+impl Draw for Drawer {
     fn draw_buffer(&self, screen_buf: &[u8]) {
         println!("{}", create_buffer_string(screen_buf, SCREEN_WIDTH));
         self.return_home();
