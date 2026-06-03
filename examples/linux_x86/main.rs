@@ -5,11 +5,12 @@ mod silly_input;
 
 use std::{error::Error, time::Duration};
 
-use chip_eight::{
-    Emulator, ReadInputState, RunningMode,
-};
+use chip_eight::{Emulator, ReadInputState, RunningMode};
 
-use crate::{debug_draw::DebugDrawer, dummy_input::DummyInput, silly_draw::Drawer, silly_input::InputListener};
+use crate::{
+    debug_draw::DebugDrawer, dummy_input::DummyInput, silly_draw::Drawer,
+    silly_input::InputListener,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = std::env::args();
