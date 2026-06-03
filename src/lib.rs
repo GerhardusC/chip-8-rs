@@ -10,8 +10,8 @@ pub const SCREEN_WIDTH: usize = 64;
 pub const SCREEN_HEIGHT: usize = 32;
 
 pub trait Draw {
-    fn draw_buffer(&self, screen_buf: &[u8]);
-    fn clear_screen(&self);
+    fn draw_buffer(&mut self, screen_buf: &[u8]);
+    fn clear_screen(&mut self);
 }
 
 pub trait ReadInputState {
