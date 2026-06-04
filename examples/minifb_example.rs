@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     sync::{
-        Arc, Mutex,
+        Arc, RwLock,
         mpsc::{self, Sender},
     },
 };
@@ -15,7 +15,7 @@ use minifb::{Window, WindowOptions};
 //
 // In this implementation is not particularly great or fancy, but it illustrates how the emulator
 // will call the requird drawing functions and respond to them.
-impl Draw for &App {
+impl Draw for DisplayOutput {
     fn draw_buffer(&mut self, screen_buf: &[u8]) {
         let _ = self.sender.send(screen_buf.to_vec());
     }
@@ -25,32 +25,24 @@ impl Draw for &App {
     }
 }
 
-impl ReadInputState for &App {
+impl ReadInputState for KeyboardInput {
     fn read_keys_state(&self) -> Result<[u8; 16], String> {
-        if let Ok(keys) = self.keys.lock() {
-            Ok(*keys)
-        } else {
-            Err("Mutext lock error".to_owned())
-        }
+        let x = self.keys.read().map_err(|e| e.to_string())?;
+        Ok(x.clone())
     }
 
     fn reset_keys_state(&mut self) {
-        let new_keys = [0; 16];
-        if let Ok(mut keys) = self.keys.lock() {
-            *keys = new_keys;
+        if let Ok(mut keys) = self.keys.write() {
+            *keys = [0; 16];
         }
     }
 }
 
+struct KeyboardInput {
+    keys: Arc<RwLock<[u8; 16]>>,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let (tx, rx) = mpsc::channel::<Vec<u8>>();
-    let keys = Arc::new(Mutex::new([0; 16]));
-
-    let app = App {
-        sender: tx.clone(),
-        keys: keys.clone(),
-    };
-
     let args = std::env::args();
 
     let program_name = if args.len() > 1
@@ -73,12 +65,33 @@ cargo run --example minifb_example /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
+    let (display_sender, display_receiver) = mpsc::channel::<Vec<u8>>();
+
+    let app = DisplayOutput {
+        sender: display_sender.clone(),
+    };
+
+    let keyboard_input = KeyboardInput {
+        keys: Arc::new(RwLock::new([0; 16])),
+    };
+
+    let (keys_sender, keys_receiver) = mpsc::channel::<[u8; 16]>();
+
+    let keys_writer = keyboard_input.keys.clone();
+    std::thread::spawn(move || {
+        while let Ok(msg) = keys_receiver.recv() {
+            if let Ok(mut keys) = keys_writer.write() {
+                *keys = msg;
+            };
+        }
+    });
+
     std::thread::spawn(move || {
         let mut window = Window::new("Minifb Chip 8 Example", 640, 320, WindowOptions::default())
             .expect("Failed to create window");
 
         while window.is_open() {
-            if let Ok(msg) = rx.try_recv() {
+            if let Ok(msg) = display_receiver.try_recv() {
                 let buffer = expand_buffer(&msg, 10, SCREEN_WIDTH);
                 let _ = window.update_with_buffer(buffer.as_slice(), 640, 320);
             }
@@ -106,21 +119,23 @@ cargo run --example minifb_example /path/to/chip8/program.c8
                     _ => {}
                 }
             }
-            if let Ok(mut keys) = keys.lock() {
-                *keys = *new_keys;
-            }
+            let _ = keys_sender.send(*new_keys);
         }
     });
 
-    let emulator = Emulator::init(program, chip_eight::RunningMode::Normal, &app, &app)?;
+    let emulator = Emulator::init(
+        program,
+        chip_eight::RunningMode::Normal,
+        app,
+        keyboard_input,
+    )?;
     emulator.run();
 
     Ok(())
 }
 
-struct App {
+struct DisplayOutput {
     sender: Sender<Vec<u8>>,
-    keys: Arc<Mutex<[u8; 16]>>,
 }
 
 // Really, not the most efficient function, but whatever, I just want to grow pixels by a factor
