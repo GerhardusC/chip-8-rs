@@ -104,7 +104,9 @@ impl ApplicationHandler for App {
         if let (Some(width), Some(height)) =
             (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
         {
-            surface.resize(width, height).unwrap();
+            if let Err(e) = surface.resize(width, height) {
+                dbg!(e);
+            };
         }
 
         self.app_state = AppState::Running { surface };
@@ -131,7 +133,9 @@ impl ApplicationHandler for App {
                 if let (Some(width), Some(height)) =
                     (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
                 {
-                    surface.resize(width, height).unwrap();
+                    if let Err(e) = surface.resize(width, height) {
+                        dbg!(e);
+                    };
                 }
             }
             WindowEvent::CloseRequested => {
