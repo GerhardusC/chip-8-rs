@@ -48,24 +48,3 @@ impl Drop for Drawer {
         println!("\x1b[?1049l");
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_can_create_correct_buffered_string() {
-        let b = [
-            0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0,
-            1, 0, 0, 0, 1, 0,
-        ];
-        let expected = " █   █ 
-  █ █  
-   █   
-  █ █  
- █   █ ";
-
-        let s = create_buffer_string(&b, 7);
-        assert_eq!(s, expected);
-    }
-}

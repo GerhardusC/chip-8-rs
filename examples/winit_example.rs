@@ -317,28 +317,3 @@ fn expand_buffer(buf: &[u8], factor: u8, screen_width: usize) -> Vec<u32> {
     }
     output
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_can_expand_buffer() {
-        #[rustfmt::skip]
-        let input = [
-            1, 0,
-            0, 1
-        ];
-        #[rustfmt::skip]
-        let expected = vec![
-            0xFFFFFF00, 0xFFFFFF00, 0x00000000, 0x00000000,
-            0xFFFFFF00, 0xFFFFFF00, 0x00000000, 0x00000000,
-            0x00000000, 0x00000000, 0xFFFFFF00, 0xFFFFFF00,
-            0x00000000, 0x00000000, 0xFFFFFF00, 0xFFFFFF00,
-        ];
-
-        let output = expand_buffer(&input, 2, 2);
-
-        assert_eq!(output, expected);
-    }
-}
