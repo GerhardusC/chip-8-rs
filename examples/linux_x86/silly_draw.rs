@@ -36,7 +36,7 @@ fn create_buffer_string(buf: &[u8], screen_width: usize) -> String {
         .map(|chars| {
             chars
                 .iter()
-                .map(|c| if *c > 0 { '█' } else { ' ' })
+                .map(|c| if *c > 0 { "██" } else { "  " })
                 .collect()
         })
         .collect::<Vec<String>>()
