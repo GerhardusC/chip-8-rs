@@ -7,4 +7,4 @@ edition = "2024"
 
 [dev-dependencies]
 winit = "0.30.13"
-pixels = "0.17.1"
+softbuffer = "0.4.8"

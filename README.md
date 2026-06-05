@@ -18,9 +18,9 @@ pub trait ReadInputState {
 }
 ```
 
-If interested, see `examples/minifb_example.rs` to find a dummy implementation that might work on other platforms than my own.
+If interested, see `examples/winit_example.rs` to find a dummy implementation that might work on other platforms than my own.
 
-You can also run `cargo run --example minifb_example /path/to/chip8/binary.c8` to try it out.
+You can also run `cargo run --example winit_example /path/to/chip8/binary.c8` to try it out.
 
 ## Usage
 
