@@ -1,13 +1,13 @@
 use std::{
     error::Error,
     sync::{
-        Arc, RwLock,
+        Arc,
+        atomic::{AtomicU8, Ordering},
         mpsc::{self, Sender},
     },
 };
 
-use chip_eight::{Draw, Emulator, ReadInputState, SCREEN_WIDTH};
-use minifb::{Window, WindowOptions};
+use chip_eight::{Draw, Emulator, ReadInputState};
 
 // The emulator needs a handle to drawing to the screen, and one for reading user input. For better
 // or worse, I have decided to implement them as traits that need to be implemented for types
@@ -16,30 +16,26 @@ use minifb::{Window, WindowOptions};
 // In this implementation is not particularly great or fancy, but it illustrates how the emulator
 // will call the requird drawing functions and respond to them.
 impl Draw for DisplayOutput {
-    fn draw_buffer(&mut self, screen_buf: &[u8]) {
-        let _ = self.sender.send(screen_buf.to_vec());
-    }
+    fn draw_buffer(&mut self, screen_buf: &[u8]) {}
 
-    fn clear_screen(&mut self) {
-        let _ = self.sender.send(vec![0; 640 * 320]);
-    }
+    fn clear_screen(&mut self) {}
 }
 
 impl ReadInputState for KeyboardInput {
     fn read_keys_state(&self) -> Result<[u8; 16], String> {
-        let x = self.keys.read().map_err(|e| e.to_string())?;
-        Ok(x.clone())
+        let x = std::array::from_fn(|i| self.keys[i].load(Ordering::Relaxed));
+        Ok(x)
     }
 
     fn reset_keys_state(&mut self) {
-        if let Ok(mut keys) = self.keys.write() {
-            *keys = [0; 16];
+        for key in self.keys.iter() {
+            key.store(0, Ordering::Relaxed);
         }
     }
 }
 
 struct KeyboardInput {
-    keys: Arc<RwLock<[u8; 16]>>,
+    keys: Arc<[AtomicU8; 16]>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -65,82 +61,29 @@ cargo run --example minifb_example /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
-    let (display_sender, display_receiver) = mpsc::channel::<Vec<u8>>();
-
-    let app = DisplayOutput {
-        sender: display_sender.clone(),
-    };
+    let display_output = DisplayOutput;
 
     let keyboard_input = KeyboardInput {
-        keys: Arc::new(RwLock::new([0; 16])),
+        keys: Arc::new(std::array::from_fn(|_| AtomicU8::new(0))),
     };
 
-    let (keys_sender, keys_receiver) = mpsc::channel::<[u8; 16]>();
-
-    let keys_writer = keyboard_input.keys.clone();
-    std::thread::spawn(move || {
-        while let Ok(msg) = keys_receiver.recv() {
-            if let Ok(mut keys) = keys_writer.write() {
-                *keys = msg;
-            };
-        }
-    });
-
-    std::thread::spawn(move || {
-        let mut window = Window::new("Minifb Chip 8 Example", 640, 320, WindowOptions::default())
-            .expect("Failed to create window");
-
-        while window.is_open() {
-            if let Ok(msg) = display_receiver.try_recv() {
-                let buffer = expand_buffer(&msg, 10, SCREEN_WIDTH);
-                let _ = window.update_with_buffer(buffer.as_slice(), 640, 320);
-            }
-            let new_keys = &mut [0; 16];
-
-            // b'x', b'1', b'2', b'3', b'q', b'w', b'e', b'a', b's', b'd', b'z', b'c', b'4', b'r', b'f', b'v',
-            for key in window.get_keys() {
-                match key {
-                    minifb::Key::X => new_keys[0] = 1,
-                    minifb::Key::Key1 => new_keys[1] = 1,
-                    minifb::Key::Key2 => new_keys[2] = 1,
-                    minifb::Key::Key3 => new_keys[3] = 1,
-                    minifb::Key::Q => new_keys[4] = 1,
-                    minifb::Key::W => new_keys[5] = 1,
-                    minifb::Key::E => new_keys[6] = 1,
-                    minifb::Key::A => new_keys[7] = 1,
-                    minifb::Key::S => new_keys[8] = 1,
-                    minifb::Key::D => new_keys[9] = 1,
-                    minifb::Key::Z => new_keys[10] = 1,
-                    minifb::Key::C => new_keys[11] = 1,
-                    minifb::Key::Key4 => new_keys[12] = 1,
-                    minifb::Key::R => new_keys[13] = 1,
-                    minifb::Key::F => new_keys[14] = 1,
-                    minifb::Key::V => new_keys[15] = 1,
-                    _ => {}
-                }
-            }
-            let _ = keys_sender.send(*new_keys);
-        }
-    });
-
-    let emulator = Emulator::init(
+    Emulator::init(
         program,
         chip_eight::RunningMode::Normal,
-        app,
+        display_output,
         keyboard_input,
-    )?;
-    emulator.run();
+    )?
+    .run();
 
     Ok(())
 }
 
-struct DisplayOutput {
-    sender: Sender<Vec<u8>>,
-}
+struct DisplayOutput;
 
 // Really, not the most efficient function, but whatever, I just want to grow pixels by a factor
 // and convert 1's to a pixel color and 0's to no pixel color (illustrated by th unit test
 // 'it_can_expand_buffer'
+#[allow(unused)]
 fn expand_buffer(buf: &[u8], factor: u8, screen_width: usize) -> Vec<u32> {
     let mut output = vec![];
 

@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 
 [dev-dependencies]
-minifb = "0.28.0"
+winit = "0.30.13"
+pixels = "0.17.1"

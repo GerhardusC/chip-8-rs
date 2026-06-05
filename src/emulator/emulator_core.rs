@@ -256,22 +256,21 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 }
             }
             FCommand::GetKey => {
-                loop {
-                    let mut key_pressed = false;
-                    if let Ok(keys) = self.input_provider.read_keys_state() {
-                        for (i, key) in keys.iter().enumerate() {
-                            if *key > 0 {
-                                self.variable_registers[register] = i as u8;
-                                key_pressed = true;
-                                break;
-                            }
+                let mut key_pressed = false;
+                if let Ok(keys) = self.input_provider.read_keys_state() {
+                    for (i, key) in keys.iter().enumerate() {
+                        if *key > 0 {
+                            self.variable_registers[register] = i as u8;
+                            key_pressed = true;
+                            break;
                         }
                     }
-                    if key_pressed {
-                        break;
-                    };
                 }
-                self.input_provider.reset_keys_state();
+                if !key_pressed {
+                    self.program_counter -= 2;
+                } else {
+                    self.input_provider.reset_keys_state();
+                };
             }
             FCommand::Unimplemented(value) => {
                 if let RunningMode::Debug = self.running_mode {
