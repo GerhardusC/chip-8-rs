@@ -19,6 +19,47 @@ use winit::{
     window::Window,
 };
 
+// This is just used to scale the resolution. The chip8 interpreter works with a 64x32 px screen by
+// default. This will just scale it, e.g. SCALE_FACTOR = 10 -> 640 * 320
+const SCALE_FACTOR: usize = 10;
+
+// The emulator needs a handle to drawing to the screen, and one for reading user input. For better
+// or worse, I have decided to implement them as traits that need to be implemented for types
+// passed to the emulator.
+//
+// In this implementation is not particularly great or fancy, but it illustrates how the emulator
+// will call the requird drawing functions and respond to them.
+impl Draw for DisplayOutput {
+    // This function will be called by the emulator whenever the draw function is encountered. Its
+    // simply a buffer of 1s and 0s.
+    fn draw_buffer(&mut self, screen_buf: &[u8]) {
+        let _ = self.buffer_sender.send(screen_buf.to_vec());
+    }
+
+    fn clear_screen(&mut self) {}
+}
+
+impl ReadInputState for KeyboardInput {
+    fn read_keys_state(&self) -> Result<[u8; 16], String> {
+        let x = std::array::from_fn(|i| self.keys[i].load(Ordering::Relaxed));
+        Ok(x)
+    }
+
+    fn reset_keys_state(&mut self) {
+        for key in self.keys.iter() {
+            key.store(0, Ordering::Relaxed);
+        }
+    }
+}
+
+struct KeyboardInput {
+    keys: Arc<[AtomicU8; 16]>,
+}
+
+struct DisplayOutput {
+    buffer_sender: Sender<Vec<u8>>,
+}
+
 struct App {
     context: Context<OwnedDisplayHandle>,
     app_state: AppState,
@@ -163,17 +204,22 @@ impl ApplicationHandler for App {
             },
             WindowEvent::RedrawRequested => {
                 let _ = surface.resize(
-                    NonZeroU32::new((SCREEN_WIDTH * 10) as u32).expect("Definitely non zero"),
-                    NonZeroU32::new((SCREEN_HEIGHT * 10) as u32).expect("Definitely non zero"),
+                    NonZeroU32::new((SCREEN_WIDTH * SCALE_FACTOR) as u32)
+                        .expect("Definitely non zero"),
+                    NonZeroU32::new((SCREEN_HEIGHT * SCALE_FACTOR) as u32)
+                        .expect("Definitely non zero"),
                 );
                 let mut buffer = surface.buffer_mut().expect("Failed to get screen buffer");
 
                 if let Ok(draw_buffer) = self.buffer_receiver.try_recv() {
-                    let expanded_buf = expand_buffer(draw_buffer.as_slice(), 10, SCREEN_WIDTH);
+                    let expanded_buf =
+                        expand_buffer(draw_buffer.as_slice(), SCALE_FACTOR as u8, SCREEN_WIDTH);
+                    if expanded_buf.len() < buffer.len() {
+                        eprintln!("Buffer too big");
+                        return;
+                    }
                     for (i, x) in buffer.iter_mut().enumerate() {
-                        if let Some(z) = expanded_buf.get(i) {
-                            *x = *z;
-                        }
+                        *x = expanded_buf[i];
                     }
                     buffer.present().expect("Failed to present buffer");
                 }
@@ -187,37 +233,6 @@ impl ApplicationHandler for App {
         };
         surface.window().request_redraw();
     }
-}
-
-// The emulator needs a handle to drawing to the screen, and one for reading user input. For better
-// or worse, I have decided to implement them as traits that need to be implemented for types
-// passed to the emulator.
-//
-// In this implementation is not particularly great or fancy, but it illustrates how the emulator
-// will call the requird drawing functions and respond to them.
-impl Draw for DisplayOutput {
-    fn draw_buffer(&mut self, screen_buf: &[u8]) {
-        let _ = self.buffer_sender.send(screen_buf.to_vec());
-    }
-
-    fn clear_screen(&mut self) {}
-}
-
-impl ReadInputState for KeyboardInput {
-    fn read_keys_state(&self) -> Result<[u8; 16], String> {
-        let x = std::array::from_fn(|i| self.keys[i].load(Ordering::Relaxed));
-        Ok(x)
-    }
-
-    fn reset_keys_state(&mut self) {
-        for key in self.keys.iter() {
-            key.store(0, Ordering::Relaxed);
-        }
-    }
-}
-
-struct KeyboardInput {
-    keys: Arc<[AtomicU8; 16]>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -276,10 +291,6 @@ cargo run --example winit_example /path/to/chip8/program.c8
     event_loop.run_app(&mut app)?;
 
     Ok(())
-}
-
-struct DisplayOutput {
-    buffer_sender: Sender<Vec<u8>>,
 }
 
 // Really, not the most efficient function, but whatever, I just want to grow pixels by a factor
