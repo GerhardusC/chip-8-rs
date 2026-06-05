@@ -51,6 +51,7 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     drawer: T,
     input_provider: P,
     running_mode: RunningMode,
+    tick_rate: Duration,
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
@@ -73,6 +74,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             drawer,
             running_mode,
             input_provider,
+            tick_rate: Duration::from_millis(1),
         };
 
         emulator.set_mem_block(&program, 0x200)?;
@@ -81,6 +83,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         Ok(emulator)
     }
 
+    pub fn set_tick_rate(&mut self, rate: Duration) -> &mut Self {
+        self.tick_rate = rate;
+        self
+    }
+
+    // TODO: See if we need to support custom fonts.
     fn set_font(&mut self, font: &[u8]) -> Result<(), ApplicationError> {
         self.set_mem_block(font, self.font_addr)
     }
@@ -403,7 +411,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         Ok(())
     }
 
-    pub fn run(mut self) {
+    pub fn run(&mut self) {
         let delay_timer = self.delay_timer.clone();
         let sound_timer = self.sound_timer.clone();
         std::thread::spawn(move || {
@@ -421,6 +429,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
         });
         match self.running_mode {
+            // TODO: Implement debug mode differently, Maybe even something like an iterator over
+            // the instructions exposing the interpreter state at each point.
             RunningMode::Debug => {
                 let mut prev_index_register = self.index_register;
                 let mut prev_program_counter = self.program_counter;
@@ -480,7 +490,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             RunningMode::Normal => loop {
                 let instruction = self.fetch();
                 self.execute(instruction);
-                std::thread::sleep(Duration::from_millis(1));
+                std::thread::sleep(self.tick_rate);
             },
         };
     }

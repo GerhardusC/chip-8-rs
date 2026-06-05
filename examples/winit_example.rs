@@ -7,6 +7,7 @@ use std::{
         atomic::{AtomicU8, Ordering},
         mpsc::{self, Receiver, Sender},
     },
+    time::Duration,
 };
 
 use chip_eight::{Draw, Emulator, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH};
@@ -280,6 +281,7 @@ cargo run --example winit_example /path/to/chip8/program.c8
             keyboard_input,
         )
         .expect("Program too large")
+        .set_tick_rate(Duration::from_millis(1))
         .run();
     });
 
