@@ -3,7 +3,7 @@ mod silly_input;
 
 use std::error::Error;
 
-use chip_eight::{Emulator, ReadInputState, RunningMode};
+use chip_eight::Emulator;
 
 use crate::{silly_draw::Drawer, silly_input::InputListener};
 
@@ -30,13 +30,7 @@ cargo run --example linux_x86 /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
-    Emulator::init(
-        program,
-        RunningMode::Normal,
-        Drawer::init(),
-        InputListener::init(),
-    )?
-    .run();
+    Emulator::init(program, Drawer::init(), InputListener::init())?.run();
 
     Ok(())
 }

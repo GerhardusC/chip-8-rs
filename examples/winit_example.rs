@@ -274,15 +274,10 @@ cargo run --example winit_example /path/to/chip8/program.c8
     let keys = keyboard_input.keys.clone();
 
     std::thread::spawn(move || {
-        Emulator::init(
-            program,
-            chip_eight::RunningMode::Normal,
-            display_output,
-            keyboard_input,
-        )
-        .expect("Program too large")
-        .set_tick_rate(Duration::from_millis(1))
-        .run();
+        Emulator::init(program, display_output, keyboard_input)
+            .expect("Program too large")
+            .set_tick_rate(Duration::from_millis(1))
+            .run();
     });
 
     let event_loop = EventLoop::new()?;

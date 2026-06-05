@@ -10,7 +10,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::ReadInputState;
+use chip_eight::ReadInputState;
 
 const ICANON: u32 = 0x00000002;
 const ECHO: u32 = 0x00000008;

@@ -20,7 +20,12 @@ pub trait ReadInputState {
 
 If interested, see `examples/winit_example.rs` to find a dummy implementation that might work on other platforms than my own.
 
+## Examples
 You can also run `cargo run --example winit_example /path/to/chip8/binary.c8` to try it out.
+
+Additionally run `cargo run --example debug_example /path/to/chip8/binary.c8` to step through a program. Hold enter to speed through, type q to quit.
+
+Potentially if you want to see the most cursed implementation check out `cargo run --example debug_example /path/to/chip8/binary.c8`.
 
 ## Usage
 
@@ -32,7 +37,7 @@ Once you have implemented your traits you just need to call `init` and `run` on 
     let drawer = Drawer::init();
     let input_reader = InputReader::init();
 
-    let emulator = chip_eight::Emulator::init(program, chip_eight::RunningMode::Normal, drawer, input_reader)
+    let emulator = chip_eight::Emulator::init(program, drawer, input_reader)
         .expect("The chip 8 program is probably too large")
         .run();
 ```

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use chip_eight::{Draw, Emulator, ReadInputState, RunningMode};
+use chip_eight::{Draw, Emulator, ReadInputState};
 
 struct DebugDrawer;
 impl Draw for DebugDrawer {
@@ -53,7 +53,7 @@ cargo run --example debug_example /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
-    Emulator::init(program, RunningMode::Debug, DebugDrawer, DummyInput)?.run();
+    Emulator::init(program, DebugDrawer, DummyInput)?.debug();
 
     Ok(())
 }

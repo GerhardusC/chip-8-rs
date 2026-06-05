@@ -50,17 +50,11 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     sound_timer: Arc<AtomicU16>,
     drawer: T,
     input_provider: P,
-    running_mode: RunningMode,
     tick_rate: Duration,
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
-    pub fn init(
-        program: Vec<u8>,
-        running_mode: RunningMode,
-        drawer: T,
-        input_provider: P,
-    ) -> Result<Self, ApplicationError> {
+    pub fn init(program: Vec<u8>, drawer: T, input_provider: P) -> Result<Self, ApplicationError> {
         let mut emulator = Self {
             memory: [0; 0x1000],
             stack: vec![],
@@ -72,7 +66,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             delay_timer: Arc::new(AtomicU16::new(0)),
             sound_timer: Arc::new(AtomicU16::new(0)),
             drawer,
-            running_mode,
             input_provider,
             tick_rate: Duration::from_millis(1),
         };
@@ -215,9 +208,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     }
                 }
                 KeyStateToCheck::Invalid => {
-                    if let RunningMode::Debug = self.running_mode {
-                        eprintln!("Unrecognised instruction.")
-                    }
+                    eprintln!("Unrecognised instruction.")
                 }
             }
         };
@@ -281,9 +272,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 };
             }
             FCommand::Unimplemented(value) => {
-                if let RunningMode::Debug = self.running_mode {
-                    eprintln!("COMMAND {value} UNIMPLEMENTED");
-                }
+                eprintln!("COMMAND {value} UNIMPLEMENTED");
             }
         }
     }
@@ -411,6 +400,63 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         Ok(())
     }
 
+    pub fn debug(&mut self) {
+        let mut prev_index_register = self.index_register;
+        let mut prev_program_counter = self.program_counter;
+        let mut prev_stack = format!("{:?}", self.stack);
+        let mut prev_memory = format!("{:?}", self.memory);
+        let mut prev_varaible_registers = format!("{:?}", self.variable_registers);
+        let mut prev_screen_buffer = format!("{:?}", self.screen_buffer);
+
+        loop {
+            let instruction = self.fetch();
+            dbg!(&instruction);
+            self.execute(instruction);
+
+            let index_register = self.index_register;
+            if prev_index_register != index_register {
+                dbg!(&index_register);
+                prev_index_register = index_register;
+            }
+            let program_counter = self.program_counter;
+            if prev_program_counter != program_counter {
+                dbg!(&program_counter);
+                prev_program_counter = program_counter;
+            }
+            let stack = format!("{:?}", &self.stack);
+            if prev_stack != stack {
+                dbg!(&stack);
+                prev_stack = stack;
+            }
+            let memory = format!("{:?}", self.memory);
+            if prev_memory != memory {
+                println!("Memory updated");
+                prev_memory = memory;
+            }
+            let varaible_registers = format!("{:?}", self.variable_registers);
+            if prev_varaible_registers != varaible_registers {
+                dbg!(&varaible_registers);
+                prev_varaible_registers = varaible_registers;
+            }
+            let screen_buffer = format!("{:?}", self.screen_buffer);
+            if prev_screen_buffer != screen_buffer {
+                dbg!("Screen_updated");
+                prev_screen_buffer = screen_buffer;
+            }
+
+            println!("Next instruction: 'n'");
+            let mut res = String::new();
+            let Ok(_) = std::io::stdin().read_line(&mut res) else {
+                break;
+            };
+            if res.trim() != "q" {
+                continue;
+            } else {
+                break;
+            }
+        }
+    }
+
     pub fn run(&mut self) {
         let delay_timer = self.delay_timer.clone();
         let sound_timer = self.sound_timer.clone();
@@ -428,78 +474,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 std::thread::sleep(Duration::from_millis(6));
             }
         });
-        match self.running_mode {
-            // TODO: Implement debug mode differently, Maybe even something like an iterator over
-            // the instructions exposing the interpreter state at each point.
-            RunningMode::Debug => {
-                let mut prev_index_register = self.index_register;
-                let mut prev_program_counter = self.program_counter;
-                let mut prev_stack = format!("{:?}", self.stack);
-                let mut prev_memory = format!("{:?}", self.memory);
-                let mut prev_varaible_registers = format!("{:?}", self.variable_registers);
-                let mut prev_screen_buffer = format!("{:?}", self.screen_buffer);
-
-                loop {
-                    let instruction = self.fetch();
-                    dbg!(&instruction);
-                    self.execute(instruction);
-
-                    let index_register = self.index_register;
-                    if prev_index_register != index_register {
-                        dbg!(&index_register);
-                        prev_index_register = index_register;
-                    }
-                    let program_counter = self.program_counter;
-                    if prev_program_counter != program_counter {
-                        dbg!(&program_counter);
-                        prev_program_counter = program_counter;
-                    }
-                    let stack = format!("{:?}", &self.stack);
-                    if prev_stack != stack {
-                        dbg!(&stack);
-                        prev_stack = stack;
-                    }
-                    let memory = format!("{:?}", self.memory);
-                    if prev_memory != memory {
-                        println!("Memory updated");
-                        prev_memory = memory;
-                    }
-                    let varaible_registers = format!("{:?}", self.variable_registers);
-                    if prev_varaible_registers != varaible_registers {
-                        dbg!(&varaible_registers);
-                        prev_varaible_registers = varaible_registers;
-                    }
-                    let screen_buffer = format!("{:?}", self.screen_buffer);
-                    if prev_screen_buffer != screen_buffer {
-                        dbg!("Screen_updated");
-                        prev_screen_buffer = screen_buffer;
-                    }
-
-                    println!("Next instruction: 'n'");
-                    let mut res = String::new();
-                    let Ok(_) = std::io::stdin().read_line(&mut res) else {
-                        break;
-                    };
-                    if res.trim() != "q" {
-                        continue;
-                    } else {
-                        break;
-                    }
-                }
-            }
-            RunningMode::Normal => loop {
-                let instruction = self.fetch();
-                self.execute(instruction);
-                std::thread::sleep(self.tick_rate);
-            },
-        };
+        loop {
+            let instruction = self.fetch();
+            self.execute(instruction);
+            std::thread::sleep(self.tick_rate);
+        }
     }
-}
-
-#[derive(Debug)]
-pub enum RunningMode {
-    Debug,
-    Normal,
 }
 
 #[cfg(test)]
@@ -521,13 +501,9 @@ mod tests {
 
     #[test]
     fn it_can_fetch_an_instruction() {
-        let mut emulator = Emulator::<DebugDrawer, DummyInput>::init(
-            vec![],
-            RunningMode::Normal,
-            DebugDrawer,
-            DummyInput,
-        )
-        .expect("All initial memory is in range");
+        let mut emulator =
+            Emulator::<DebugDrawer, DummyInput>::init(vec![], DebugDrawer, DummyInput)
+                .expect("All initial memory is in range");
 
         emulator
             .set_font(&FONT)
