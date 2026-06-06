@@ -12,6 +12,7 @@ use crate::{
     emulator::{
         instructions::{Instruction, KeyStateToCheck},
         logical_operator::{Direction, LogicalOperator},
+        quirks::{QuirksFields, QuirksMode},
         sub_commands::FCommand,
     },
     u8_to_arr,
@@ -39,7 +40,6 @@ const FONT: [u8; 80] = [
 #[derive(Debug)]
 pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
-    // TODO: Check if stack pointer needs to exist
     stack: Vec<usize>,
     variable_registers: [u8; 16],
     screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
@@ -51,6 +51,7 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     drawer: T,
     input_provider: P,
     tick_rate: Duration,
+    quirks: QuirksFields,
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
@@ -68,6 +69,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             drawer,
             input_provider,
             tick_rate: Duration::from_millis(1),
+            quirks: QuirksMode::Chip8.into(),
         };
 
         emulator.set_mem_block(&program, 0x200)?;
@@ -248,10 +250,16 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 {
                     self.variable_registers[i] = *reg;
                 }
+                if self.quirks.memory {
+                    self.index_register += register + 1;
+                }
             }
             FCommand::StoreTo => {
                 for (i, reg) in self.variable_registers[0..=register].iter().enumerate() {
                     self.memory[self.index_register + i] = *reg;
+                }
+                if self.quirks.memory {
+                    self.index_register += register + 1;
                 }
             }
             FCommand::GetKey => {
@@ -289,12 +297,21 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
             LogicalOperator::BinaryOr => {
                 self.variable_registers[register_x] |= self.variable_registers[register_y];
+                if self.quirks.vf_reset {
+                    self.variable_registers[0xF] = 0;
+                }
             }
             LogicalOperator::BinaryAnd => {
                 self.variable_registers[register_x] &= self.variable_registers[register_y];
+                if self.quirks.vf_reset {
+                    self.variable_registers[0xF] = 0;
+                }
             }
             LogicalOperator::LogicalXor => {
                 self.variable_registers[register_x] ^= self.variable_registers[register_y];
+                if self.quirks.vf_reset {
+                    self.variable_registers[0xF] = 0;
+                }
             }
             LogicalOperator::AddAffectingCarry => {
                 let res = self.variable_registers[register_x] as u16
@@ -315,14 +332,14 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.variable_registers[0xF] = if res >= 0 { 1 } else { 0 };
             }
             LogicalOperator::Shift(direction) => {
-                // TODO: Possible feature to optionally set VX to the value of VY
+                if self.quirks.shifting {
+                    self.variable_registers[register_x] = self.variable_registers[register_y];
+                }
+
                 match direction {
                     Direction::Left => {
-                        // NEXT LINE ONLY IN QUIRKS
-                        self.variable_registers[register_x] = self.variable_registers[register_y];
-
-                        let top = self.variable_registers[register_y] & 0b1000_0000;
-                        let res = self.variable_registers[register_y] << 1;
+                        let top = self.variable_registers[register_x] & 0b1000_0000;
+                        let res = self.variable_registers[register_x] << 1;
                         self.variable_registers[register_x] = res;
                         if top > 0 {
                             self.variable_registers[0xF] = 1
@@ -331,11 +348,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         };
                     }
                     Direction::Right => {
-                        // NEXT LINE ONLY IN QUIRKS
-                        self.variable_registers[register_x] = self.variable_registers[register_y];
-
-                        let bot = self.variable_registers[register_y] & 0b1;
-                        let res = self.variable_registers[register_y] >> 1;
+                        let bot = self.variable_registers[register_x] & 0b1;
+                        let res = self.variable_registers[register_x] >> 1;
                         self.variable_registers[register_x] = res;
                         if bot > 0 {
                             self.variable_registers[0xF] = 1
