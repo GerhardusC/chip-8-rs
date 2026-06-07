@@ -24,7 +24,25 @@ struct DummyInput;
 
 impl ReadInputState for DummyInput {
     fn read_keys_state(&self) -> Result<[u8; 16], String> {
-        Ok([0; 16])
+        println!("\x1b[32;1mENTER ALL PRESSED KEYS:\x1b[0m");
+        let mut keys = [
+            b'x', b'1', b'2', b'3', b'q', b'w', b'e', b'a', b's', b'd', b'z', b'c', b'4', b'r',
+            b'f', b'v',
+        ];
+
+        let mut res = String::new();
+        let Ok(_) = std::io::stdin().read_line(&mut res) else {
+            return Ok([0; 16]);
+        };
+        for key in keys.iter_mut() {
+            if res.contains(char::from(*key)) {
+                *key = 1;
+            } else {
+                *key = 0;
+            }
+        }
+
+        Ok(keys)
     }
 
     fn reset_keys_state(&mut self) {}
