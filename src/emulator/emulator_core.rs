@@ -51,6 +51,7 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     drawer: T,
     input_provider: P,
     tick_rate: Duration,
+    max_draw_delay: Duration,
     last_draw: SystemTime,
     quirks: QuirksFields,
 }
@@ -70,6 +71,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             drawer,
             input_provider,
             tick_rate: Duration::from_millis(1),
+            max_draw_delay: Duration::from_millis(6),
             last_draw: SystemTime::now(),
             quirks: QuirksMode::Chip8.into(),
         };
@@ -82,6 +84,11 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
 
     pub fn set_tick_rate(&mut self, rate: Duration) -> &mut Self {
         self.tick_rate = rate;
+        self
+    }
+
+    pub fn set_max_draw_delay(&mut self, rate: Duration) -> &mut Self {
+        self.max_draw_delay = rate;
         self
     }
 
@@ -161,7 +168,11 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 register_x,
                 address,
             } => {
-                self.program_counter = address + self.variable_registers[register_x] as usize;
+                if self.quirks.jumping {
+                    self.program_counter = address + self.variable_registers[register_x] as usize;
+                } else {
+                    self.program_counter = address + self.variable_registers[0] as usize;
+                }
             }
             Instruction::Random {
                 register_x,
@@ -233,7 +244,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.index_register += self.variable_registers[register] as usize;
             }
             FCommand::GetFontCharacter => {
-                self.index_register = self.font_addr + self.variable_registers[register] as usize;
+                self.index_register =
+                    self.font_addr + (self.variable_registers[register] * 5) as usize;
             }
             FCommand::DecimalConversion => {
                 let val = self.variable_registers[register];
@@ -330,10 +342,11 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.variable_registers[0xF] = if res >= 0 { 1 } else { 0 };
             }
             LogicalOperator::Shift(direction) => {
-                if self.quirks.shifting {
+                // NOTE: Though this quirk is called shifting, to be more in line with the test
+                // suite, this is inverted.
+                if !self.quirks.shifting {
                     self.variable_registers[register_x] = self.variable_registers[register_y];
                 }
-
                 match direction {
                     Direction::Left => {
                         let top = self.variable_registers[register_x] & 0b1000_0000;
@@ -414,29 +427,25 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 }
 
                 if let Some(x) = self.screen_buffer.get_mut((to_get_index) as usize) {
-                    let pixel = mask & sprite_row;
-                    if *x > 0 && pixel > 0 {
-                        *x = 0;
+                    let pixel = if (mask & sprite_row) > 0 { 1 } else { 0 };
+                    // Collision flag if target and px are both on.
+                    if pixel > 0 && *x > 0 {
                         self.variable_registers[0xF] = 1;
-                    } else if *x == 0 && pixel > 0 {
-                        self.variable_registers[0xF] = 1;
-                        *x = if pixel > 0 { 1 } else { 0 };
                     }
+                    *x ^= pixel;
                 }
             }
         }
 
         let now = SystemTime::now();
 
-        let time_since_last_draw = now
-            .duration_since(self.last_draw)
-            .expect("Earlier is before now.");
-
-        // TODO: Extract into lazy var.
         if self.quirks.disp_wait {
-            let six_millis = Duration::from_millis(6);
-            if time_since_last_draw < six_millis {
-                std::thread::sleep(six_millis - time_since_last_draw);
+            let time_since_last_draw = now
+                .duration_since(self.last_draw)
+                .expect("Earlier is before now.");
+
+            if time_since_last_draw < self.max_draw_delay {
+                std::thread::sleep(self.max_draw_delay - time_since_last_draw);
             }
             self.last_draw = SystemTime::now();
         }

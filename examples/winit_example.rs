@@ -278,6 +278,7 @@ cargo run --example winit_example /path/to/chip8/program.c8
         Emulator::init(program, display_output, keyboard_input)
             .expect("Program too large")
             .set_tick_rate(Duration::from_millis(1))
+            .set_max_draw_delay(Duration::from_millis(4))
             .run();
     });
 
