@@ -50,7 +50,6 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     sound_timer: Arc<AtomicU16>,
     drawer: T,
     input_provider: P,
-    tick_rate: Duration,
     max_draw_delay: Duration,
     last_draw: SystemTime,
     quirks: QuirksFields,
@@ -70,8 +69,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             sound_timer: Arc::new(AtomicU16::new(0)),
             drawer,
             input_provider,
-            tick_rate: Duration::from_millis(1),
-            max_draw_delay: Duration::from_millis(6),
+            max_draw_delay: Duration::from_millis(7),
             last_draw: SystemTime::now(),
             quirks: QuirksMode::Chip8.into(),
         };
@@ -80,11 +78,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         emulator.set_font(&FONT)?;
 
         Ok(emulator)
-    }
-
-    pub fn set_tick_rate(&mut self, rate: Duration) -> &mut Self {
-        self.tick_rate = rate;
-        self
     }
 
     pub fn set_quirks_mode(&mut self, quirks_mode: QuirksMode) -> &mut Self {
@@ -560,7 +553,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         loop {
             let instruction = self.fetch();
             self.execute(instruction);
-            std::thread::sleep(self.tick_rate);
         }
     }
 }
