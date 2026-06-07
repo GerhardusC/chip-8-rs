@@ -216,7 +216,8 @@ impl ApplicationHandler for App {
                 );
                 let mut buffer = surface.buffer_mut().expect("Failed to get screen buffer");
 
-                if let Ok(draw_buffer) = self.buffer_receiver.try_recv() {
+                if let Ok(draw_buffer) = self.buffer_receiver.recv_timeout(Duration::from_millis(6))
+                {
                     let expanded_buf =
                         expand_buffer(draw_buffer.as_slice(), SCALE_FACTOR as u8, SCREEN_WIDTH);
                     if expanded_buf.len() < buffer.len() {

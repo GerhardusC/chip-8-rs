@@ -3,7 +3,7 @@ use std::{
         Arc,
         atomic::{AtomicU16, Ordering},
     },
-    time::{Duration, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 // NOTE: The test roms were found at https://github.com/Timendus/chip8-test-suite
 
@@ -51,6 +51,7 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     drawer: T,
     input_provider: P,
     tick_rate: Duration,
+    last_draw: SystemTime,
     quirks: QuirksFields,
 }
 
@@ -69,6 +70,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             drawer,
             input_provider,
             tick_rate: Duration::from_millis(1),
+            last_draw: SystemTime::now(),
             quirks: QuirksMode::Chip8.into(),
         };
 
@@ -209,9 +211,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                         self.program_counter += 2;
                     }
                 }
-                KeyStateToCheck::Invalid => {
-                    eprintln!("Unrecognised instruction.")
-                }
+                KeyStateToCheck::Invalid => {}
             }
         };
     }
@@ -279,9 +279,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     self.input_provider.reset_keys_state();
                 };
             }
-            FCommand::Unimplemented(value) => {
-                eprintln!("COMMAND {value} UNIMPLEMENTED");
-            }
+            FCommand::Unimplemented(_value) => {}
         }
     }
 
@@ -365,30 +363,82 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
 
     fn draw(&mut self, x_register: usize, y_register: usize, height: u8) {
         self.variable_registers[0xF] = 0;
-        let x_value = self.variable_registers[x_register] as u16;
-        let y_value = self.variable_registers[y_register] as u16;
+        let (x_value, y_value) = (
+            (self.variable_registers[x_register] % SCREEN_WIDTH as u8) as u16,
+            (self.variable_registers[y_register] % SCREEN_HEIGHT as u8) as u16,
+        );
+
         let start_loc = y_value * SCREEN_WIDTH as u16 + x_value;
 
         // For each row in the sprite
         for i in 0..height {
-            let sprite = self.memory[self.index_register + i as usize];
+            let mut overdrawn_y = false;
+            let sprite_row = self.memory[self.index_register + i as usize];
 
             let current_loc = start_loc + SCREEN_WIDTH as u16 * i as u16;
 
+            if y_value + i as u16 > (SCREEN_HEIGHT - 1) as u16 {
+                if self.quirks.clipping {
+                    continue;
+                } else {
+                    overdrawn_y = true;
+                }
+            }
             // For each pixel in the row
             for j in 0..8 {
+                let mut overdrawn_x = false;
                 let mask: u8 = 0b10000000 >> j;
-                if let Some(x) = self.screen_buffer.get_mut(current_loc as usize + j) {
-                    let ans = mask & sprite;
-                    if *x > 0 && ans > 0 {
+
+                if (x_value + j) > (SCREEN_WIDTH - 1) as u16 {
+                    if self.quirks.clipping {
+                        continue;
+                    } else {
+                        overdrawn_x = true;
+                    }
+                }
+
+                let mut to_get_index = current_loc + j;
+
+                // NOTE: Only in Quirks.clipping
+                // Because we working with a flattened array, lol
+                // subract one row to keep alignment of the px
+                if overdrawn_x {
+                    to_get_index -= SCREEN_WIDTH as u16;
+                }
+
+                // NOTE: Only in Quirks.clipping
+                // If we go off the bottom of the screen, subract an entire screen
+                // to get back to the top
+                if overdrawn_y {
+                    to_get_index -= (SCREEN_WIDTH * SCREEN_HEIGHT) as u16;
+                }
+
+                if let Some(x) = self.screen_buffer.get_mut((to_get_index) as usize) {
+                    let pixel = mask & sprite_row;
+                    if *x > 0 && pixel > 0 {
                         *x = 0;
                         self.variable_registers[0xF] = 1;
-                    } else if *x == 0 && ans > 0 {
+                    } else if *x == 0 && pixel > 0 {
                         self.variable_registers[0xF] = 1;
-                        *x = if ans > 0 { 1 } else { 0 };
+                        *x = if pixel > 0 { 1 } else { 0 };
                     }
                 }
             }
+        }
+
+        let now = SystemTime::now();
+
+        let time_since_last_draw = now
+            .duration_since(self.last_draw)
+            .expect("Earlier is before now.");
+
+        // TODO: Extract into lazy var.
+        if self.quirks.disp_wait {
+            let six_millis = Duration::from_millis(6);
+            if time_since_last_draw < six_millis {
+                std::thread::sleep(six_millis - time_since_last_draw);
+            }
+            self.last_draw = SystemTime::now();
         }
         self.drawer.draw_buffer(&self.screen_buffer);
     }
