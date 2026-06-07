@@ -5,3 +5,4 @@ mod quirks;
 mod sub_commands;
 
 pub use emulator_core::*;
+pub use quirks::*;

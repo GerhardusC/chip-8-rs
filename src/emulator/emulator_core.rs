@@ -87,6 +87,16 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         self
     }
 
+    pub fn set_quirks_mode(&mut self, quirks_mode: QuirksMode) -> &mut Self {
+        self.quirks = quirks_mode.into();
+        self
+    }
+
+    pub fn with_custom_quirks(&mut self, quirks: QuirksFields) -> &mut Self {
+        self.quirks = quirks;
+        self
+    }
+
     pub fn set_max_draw_delay(&mut self, rate: Duration) -> &mut Self {
         self.max_draw_delay = rate;
         self

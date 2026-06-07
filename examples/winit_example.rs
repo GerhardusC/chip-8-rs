@@ -10,7 +10,9 @@ use std::{
     time::Duration,
 };
 
-use chip_eight::{Draw, Emulator, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH};
+use chip_eight::{
+    Draw, Emulator, QuirksMode, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH, SuperChipBehaviour,
+};
 use softbuffer::{Context, Surface};
 use winit::{
     application::ApplicationHandler,
@@ -279,6 +281,7 @@ cargo run --example winit_example /path/to/chip8/program.c8
             .expect("Program too large")
             .set_tick_rate(Duration::from_millis(1))
             .set_max_draw_delay(Duration::from_millis(4))
+            .set_quirks_mode(QuirksMode::Chip8)
             .run();
     });
 
