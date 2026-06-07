@@ -248,21 +248,32 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
             FCommand::GetFontCharacter => {
                 self.index_register =
-                    self.font_addr + (self.variable_registers[register] * 5) as usize;
+                    self.font_addr + (self.variable_registers[register] as usize * 5);
             }
             FCommand::DecimalConversion => {
                 let val = self.variable_registers[register];
                 let val = u8_to_arr(val);
 
                 for (i, val) in val.iter().enumerate() {
-                    self.memory[self.index_register + i] = *val;
+                    if let Some(x) = self.memory.get_mut(self.index_register + i) {
+                        *x = *val;
+                    };
                 }
             }
             FCommand::LoadFrom => {
-                for (i, reg) in self.memory[self.index_register..=(self.index_register + register)]
-                    .iter()
-                    .enumerate()
-                {
+                let end = if self.index_register + register > self.memory.len() - 1 {
+                    self.memory.len() - 2
+                } else {
+                    self.index_register + register
+                };
+
+                let start = if self.index_register > self.memory.len() - 1 {
+                    self.memory.len() - 2
+                } else {
+                    self.index_register
+                };
+
+                for (i, reg) in self.memory[start..=end].iter().enumerate() {
                     self.variable_registers[i] = *reg;
                 }
                 if self.quirks.memory {
@@ -271,7 +282,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
             FCommand::StoreTo => {
                 for (i, reg) in self.variable_registers[0..=register].iter().enumerate() {
-                    self.memory[self.index_register + i] = *reg;
+                    if let Some(x) = self.memory.get_mut(self.index_register + i) {
+                        *x = *reg;
+                    }
                 }
                 if self.quirks.memory {
                     self.index_register += register + 1;
@@ -389,7 +402,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         // For each row in the sprite
         for i in 0..height {
             let mut overdrawn_y = false;
-            let sprite_row = self.memory[self.index_register + i as usize];
+            let Some(sprite_row) = self.memory.get(self.index_register + i as usize) else {
+                break;
+            };
 
             let current_loc = start_loc + SCREEN_WIDTH as u16 * i as u16;
 
