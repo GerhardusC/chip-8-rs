@@ -10,9 +10,7 @@ use std::{
     time::Duration,
 };
 
-use chip_eight::{
-    Draw, Emulator, QuirksMode, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH, SuperChipBehaviour,
-};
+use chip_eight::{Draw, Emulator, QuirksMode, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH};
 use softbuffer::{Context, Surface};
 use winit::{
     application::ApplicationHandler,
