@@ -95,7 +95,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         self
     }
 
-    // TODO: See if we need to support custom fonts.
     fn set_font(&mut self, font: &[u8]) -> Result<(), ApplicationError> {
         self.set_mem_block(font, self.font_addr)
     }
@@ -261,21 +260,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 }
             }
             FCommand::LoadFrom => {
-                let end = if self.index_register + register > self.memory.len() - 1 {
-                    self.memory.len() - 2
-                } else {
-                    self.index_register + register
-                };
-
-                let start = if self.index_register > self.memory.len() - 1 {
-                    self.memory.len() - 2
-                } else {
-                    self.index_register
-                };
-
-                for (i, reg) in self.memory[start..=end].iter().enumerate() {
-                    self.variable_registers[i] = *reg;
+                for (i, reg) in self.variable_registers[0..=register].iter_mut().enumerate() {
+                    if let Some(x) = self.memory.get(self.index_register + i) {
+                        *reg = *x;
+                    }
                 }
+
                 if self.quirks.memory {
                     self.index_register += register + 1;
                 }
@@ -391,11 +381,11 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     }
 
     fn draw(&mut self, x_register: usize, y_register: usize, height: u8) {
-        self.variable_registers[0xF] = 0;
         let (x_value, y_value) = (
             (self.variable_registers[x_register] % SCREEN_WIDTH as u8) as u16,
             (self.variable_registers[y_register] % SCREEN_HEIGHT as u8) as u16,
         );
+        self.variable_registers[0xF] = 0;
 
         let start_loc = y_value * SCREEN_WIDTH as u16 + x_value;
 
@@ -455,9 +445,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
         }
 
-        let now = SystemTime::now();
-
         if self.quirks.disp_wait {
+            let now = SystemTime::now();
             let time_since_last_draw = now
                 .duration_since(self.last_draw)
                 .expect("Earlier is before now.");
