@@ -248,7 +248,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
             FCommand::GetFontCharacter => {
                 self.index_register =
-                    self.font_addr + (self.variable_registers[register] as usize * 5);
+                    self.font_addr + ((self.variable_registers[register] & 0xF) as usize * 5);
             }
             FCommand::DecimalConversion => {
                 let val = self.variable_registers[register];
