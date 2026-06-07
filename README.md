@@ -29,8 +29,6 @@ Potentially if you want to see the most cursed implementation check out `cargo r
 
 ## Usage
 
-I have not implemented quirks yet, so usage will change, probably.
-
 Once you have implemented your traits you just need to call `init` and `run` on the emulator. Init loads the program, and will throw an error if the program or font would load out of range. Currently the font is static, so it won't cause a panic, but same can't be said if you try load Bee Movie in as a ch8 program.
 
 ```rust
@@ -39,14 +37,19 @@ Once you have implemented your traits you just need to call `init` and `run` on 
 
     let emulator = chip_eight::Emulator::init(program, drawer, input_reader)
         .expect("The chip 8 program is probably too large")
+        // Optionally you can set a couple of internal settings for the interpreter, these are the defaults
+        // This is the rate at which instructions will be executed, kind of.
+        .set_tick_rate(Duration::from_millis(1))
+        // If the display quirk is enabled, this is how long it will wait minimum before requesting another draw
+        .set_max_draw_delay(Duration::from_millis(6))
+        // This is how to set quirks mode, options: Chip8, SuperChip(Modern|Legacy), XOChip.
+        .set_quirks_mode(QuirksMode::Chip8)
         .run();
 ```
 
-## Configuration
+## Notes
 
-So I tried to implement the quirks as best I can, but they are quite finicky.
-
-The emulator will block the current thread, so do make sure you do the input handling off thread. Maybe this is a place for improving the UX for this library, not really sure.
+The emulator will block the current thread, so do make sure you do the input handling and display off thread. Maybe this is a place for improving the UX for this library, not really sure.
 
 ## References
 
