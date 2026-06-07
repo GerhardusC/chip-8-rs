@@ -42,10 +42,17 @@ Once you have implemented your traits you just need to call `init` and `run` on 
         .run();
 ```
 
+## Configuration
+
+So I tried to implement the quirks as best I can, but they are quite finicky.
+
 The emulator will block the current thread, so do make sure you do the input handling off thread. Maybe this is a place for improving the UX for this library, not really sure.
 
-## TODO
-- Ironically, TODO: Populate todo list more
-- Implement quirks
-- Find out if the flashing is normal
+## References
+
+[Chip 8 test suite](https://github.com/Timendus/chip8-test-suite/tree/main)
+[Tuturial on how to build a Chip 8 interpreter](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/)
+[How I finally found out how to do the drawing properly, mostly](https://www.laurencescotford.net/2020/07/19/chip-8-on-the-cosmac-vip-drawing-sprites/)
+[Where I stole winit example state enum idea](https://github.com/rust-windowing/softbuffer/)
+[Where to find some games to test](https://johnearnest.github.io/chip8Archive/) (Only the top ones I think so far)
 

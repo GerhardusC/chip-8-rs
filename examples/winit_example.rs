@@ -307,7 +307,7 @@ fn expand_buffer(buf: &[u8], factor: u8, screen_width: usize) -> Vec<u32> {
         let mut acc = vec![];
         for c in chunk {
             for _ in 0..factor {
-                acc.push(if *c > 0 { 0xFFFFFF00 } else { 0x0 });
+                acc.push(if *c > 0 { 0xBBBBBB } else { 0x111111 });
             }
         }
 
