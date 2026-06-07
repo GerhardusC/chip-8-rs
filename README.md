@@ -38,8 +38,6 @@ Once you have implemented your traits you just need to call `init` and `run` on 
     let emulator = chip_eight::Emulator::init(program, drawer, input_reader)
         .expect("The chip 8 program is probably too large")
         // Optionally you can set a couple of internal settings for the interpreter, these are the defaults
-        // This is the rate at which instructions will be executed, kind of.
-        .set_tick_rate(Duration::from_millis(1))
         // If the display quirk is enabled, this is how long it will wait minimum before requesting another draw
         .set_max_draw_delay(Duration::from_millis(6))
         // This is how to set quirks mode, options: Chip8, SuperChip(Modern|Legacy), XOChip.
