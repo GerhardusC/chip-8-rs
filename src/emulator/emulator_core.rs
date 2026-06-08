@@ -254,14 +254,16 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 let val = u8_to_arr(val);
 
                 for (i, val) in val.iter().enumerate() {
-                    if let Some(x) = self.memory.get_mut(self.index_register + i) {
+                    let wrapped = (self.index_register + i) % self.memory.len();
+                    if let Some(x) = self.memory.get_mut(wrapped) {
                         *x = *val;
                     };
                 }
             }
             FCommand::LoadFrom => {
                 for (i, reg) in self.variable_registers[0..=register].iter_mut().enumerate() {
-                    if let Some(x) = self.memory.get(self.index_register + i) {
+                    let wrapped = (self.index_register + i) % self.memory.len();
+                    if let Some(x) = self.memory.get(wrapped) {
                         *reg = *x;
                     }
                 }
@@ -272,7 +274,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
             FCommand::StoreTo => {
                 for (i, reg) in self.variable_registers[0..=register].iter().enumerate() {
-                    if let Some(x) = self.memory.get_mut(self.index_register + i) {
+                    let wrapped = (self.index_register + i) % self.memory.len();
+                    if let Some(x) = self.memory.get_mut(wrapped) {
                         *x = *reg;
                     }
                 }
@@ -392,7 +395,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         // For each row in the sprite
         for i in 0..height {
             let mut overdrawn_y = false;
-            let Some(sprite_row) = self.memory.get(self.index_register + i as usize) else {
+            let wrapped_mem_index = (self.index_register + i as usize) % self.memory.len();
+            let Some(sprite_row) = self.memory.get(wrapped_mem_index) else {
                 break;
             };
 
