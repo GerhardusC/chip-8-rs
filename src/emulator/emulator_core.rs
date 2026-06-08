@@ -235,6 +235,38 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.drawer
                     .draw_buffer(&self.screen_buffer, self.screen_width, self.screen_height);
             }
+            Instruction::ScrollDown { amount } => {
+                let px_to_shift = self.screen_width * amount as usize;
+                let mut new_buffer = vec![0; px_to_shift];
+                new_buffer.extend(&self.screen_buffer);
+                new_buffer.resize(self.screen_width * self.screen_height, 0);
+                self.screen_buffer = new_buffer;
+            }
+            Instruction::ScrollRight => {
+                let new_buffer: Vec<u8> = self
+                    .screen_buffer
+                    .chunks(self.screen_width)
+                    .flat_map(|x| {
+                        let mut row = vec![0, 0, 0, 0];
+                        row.extend(x);
+                        row.resize(self.screen_width, 0);
+                        row
+                    })
+                    .collect();
+                self.screen_buffer = new_buffer;
+            }
+            Instruction::ScrollLeft => {
+                let new_buffer: Vec<u8> = self
+                    .screen_buffer
+                    .chunks(self.screen_width)
+                    .flat_map(|x| {
+                        let mut row = x[4..].to_vec();
+                        row.resize(self.screen_width, 0);
+                        row
+                    })
+                    .collect();
+                self.screen_buffer = new_buffer;
+            }
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
         }

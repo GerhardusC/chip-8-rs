@@ -10,6 +10,12 @@ impl From<u16> for Instruction {
             0x0 if value == 0x00FF => Self::SetHiRes,
             0x0 if value == 0x00FE => Self::SetLoRes,
 
+            0x0 if value == 0x00FB => Self::ScrollRight,
+            0x0 if value == 0x00FC => Self::ScrollLeft,
+
+            0x0 if value & 0x00F0 == 0x00C0 => Self::ScrollDown {
+                amount: (value & 0xF) as u8,
+            },
             0x0 => Self::Unimplemented(value),
             // 1NNN (jump)
             0x1 => Self::Jump(0x0FFF & value),
@@ -148,6 +154,11 @@ pub enum Instruction {
     },
     SetHiRes,
     SetLoRes,
+    ScrollDown {
+        amount: u8,
+    },
+    ScrollRight,
+    ScrollLeft,
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]
