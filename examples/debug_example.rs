@@ -4,14 +4,10 @@ use chip_eight::{Draw, Emulator, ReadInputState};
 
 struct DebugDrawer;
 impl Draw for DebugDrawer {
-    fn draw_buffer(&mut self, screen_buf: &[u8]) {
+    fn draw_buffer(&mut self, screen_buf: &[u8], screen_width: usize, _screen_height: usize) {
         let x = screen_buf
-            .chunks(64)
-            .map(|s| {
-                s.iter()
-                    .map(|c| if *c == 0 { "  " } else { "██" })
-                    .collect()
-            })
+            .chunks(screen_width)
+            .map(|s| s.iter().map(|c| if *c == 0 { ' ' } else { '█' }).collect())
             .collect::<Vec<String>>()
             .join("\n");
         println!("{}", x);

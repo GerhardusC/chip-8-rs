@@ -3,16 +3,14 @@ use crate::emulator::{logical_operator::LogicalOperator, sub_commands::FCommand}
 impl From<u16> for Instruction {
     fn from(value: u16) -> Self {
         match value >> 12 {
+            0x0 if value == 0x00EE => Self::Return,
             // 00E0 (clear screen)
-            0x0 => {
-                if value == 0x00EE {
-                    Self::Return
-                } else if value == 0x00E0 {
-                    Self::ClearScreen
-                } else {
-                    Self::Unimplemented(value)
-                }
-            }
+            0x0 if value == 0x00E0 => Self::ClearScreen,
+
+            0x0 if value == 0x00FF => Self::SetHiRes,
+            0x0 if value == 0x00FE => Self::SetLoRes,
+
+            0x0 => Self::Unimplemented(value),
             // 1NNN (jump)
             0x1 => Self::Jump(0x0FFF & value),
             0x2 => Self::Call((0x0FFF & value) as usize),
@@ -148,6 +146,8 @@ pub enum Instruction {
         register: usize,
         state_to_check: KeyStateToCheck,
     },
+    SetHiRes,
+    SetLoRes,
     #[allow(unused)]
     Unimplemented(u16),
     #[allow(unused)]

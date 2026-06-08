@@ -1,4 +1,4 @@
-use chip_eight::{Draw, SCREEN_HEIGHT, SCREEN_WIDTH};
+use chip_eight::Draw;
 use std::io::Write;
 
 pub struct Drawer;
@@ -17,14 +17,14 @@ impl Drawer {
 }
 
 impl Draw for Drawer {
-    fn draw_buffer(&mut self, screen_buf: &[u8]) {
-        println!("{}", create_buffer_string(screen_buf, SCREEN_WIDTH));
+    fn draw_buffer(&mut self, screen_buf: &[u8], screen_width: usize, _screen_height: usize) {
+        println!("{}", create_buffer_string(screen_buf, screen_width));
         self.return_home();
     }
 
     fn clear_screen(&mut self) {
         self.return_home();
-        let x = (" ".repeat(SCREEN_WIDTH * 5) + "\n").repeat(SCREEN_HEIGHT * 5);
+        let x = (" ".repeat(128) + "\n").repeat(128);
 
         println!("{x}");
         self.return_home();
@@ -36,7 +36,7 @@ fn create_buffer_string(buf: &[u8], screen_width: usize) -> String {
         .map(|chars| {
             chars
                 .iter()
-                .map(|c| if *c > 0 { "██" } else { "  " })
+                .map(|c| if *c > 0 { '█' } else { ' ' })
                 .collect()
         })
         .collect::<Vec<String>>()

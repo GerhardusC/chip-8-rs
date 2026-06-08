@@ -8,7 +8,7 @@ use std::{
 // NOTE: The test roms were found at https://github.com/Timendus/chip8-test-suite
 
 use crate::{
-    ApplicationError, Draw, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH,
+    ApplicationError, BASE_SCREEN_HEIGHT, BASE_SCREEN_WIDTH, Draw, ReadInputState,
     emulator::{
         instructions::{Instruction, KeyStateToCheck},
         logical_operator::{Direction, LogicalOperator},
@@ -42,7 +42,7 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
     stack: Vec<usize>,
     variable_registers: [u8; 16],
-    screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
+    screen_buffer: Vec<u8>,
     font_addr: usize,
     index_register: usize,
     program_counter: usize,
@@ -53,6 +53,8 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     max_draw_delay: Duration,
     last_draw: SystemTime,
     quirks: QuirksFields,
+    screen_width: usize,
+    screen_height: usize,
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
@@ -61,7 +63,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             memory: [0; 0x1000],
             stack: vec![],
             variable_registers: [0; 16],
-            screen_buffer: [0; SCREEN_WIDTH * SCREEN_HEIGHT],
+            screen_buffer: vec![0; BASE_SCREEN_WIDTH * BASE_SCREEN_HEIGHT],
             font_addr: 0x50,
             index_register: 0,
             program_counter: 0x200,
@@ -72,6 +74,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             max_draw_delay: Duration::from_millis(7),
             last_draw: SystemTime::now(),
             quirks: QuirksMode::Chip8.into(),
+            screen_width: 64,
+            screen_height: 32,
         };
 
         emulator.set_mem_block(&program, 0x200)?;
@@ -104,6 +108,16 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         let bothalf = self.memory[self.program_counter + 1];
         self.program_counter += 2;
         (((tophalf as u16) << 8) | bothalf as u16).into()
+    }
+
+    fn set_high_res(&mut self) {
+        self.screen_width = BASE_SCREEN_WIDTH << 1;
+        self.screen_height = BASE_SCREEN_HEIGHT << 1;
+    }
+
+    fn set_low_res(&mut self) {
+        self.screen_width = BASE_SCREEN_WIDTH;
+        self.screen_height = BASE_SCREEN_HEIGHT;
     }
 
     fn execute(&mut self, instruction: Instruction) {
@@ -204,6 +218,22 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 state_to_check,
             } => {
                 self.skip_if_key(state_to_check, register);
+            }
+            Instruction::SetHiRes => {
+                self.set_high_res();
+                self.screen_buffer
+                    .resize(self.screen_width * self.screen_height, 0);
+                self.wait_to_display();
+                self.drawer
+                    .draw_buffer(&self.screen_buffer, self.screen_width, self.screen_height);
+            }
+            Instruction::SetLoRes => {
+                self.set_low_res();
+                self.screen_buffer
+                    .resize(self.screen_width * self.screen_height, 0);
+                self.wait_to_display();
+                self.drawer
+                    .draw_buffer(&self.screen_buffer, self.screen_width, self.screen_height);
             }
             Instruction::Unimplemented(_) => {}
             Instruction::Error(_) => {}
@@ -385,12 +415,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
 
     fn draw(&mut self, x_register: usize, y_register: usize, height: u8) {
         let (x_value, y_value) = (
-            (self.variable_registers[x_register] % SCREEN_WIDTH as u8) as u16,
-            (self.variable_registers[y_register] % SCREEN_HEIGHT as u8) as u16,
+            (self.variable_registers[x_register] % self.screen_width as u8) as u16,
+            (self.variable_registers[y_register] % self.screen_height as u8) as u16,
         );
         self.variable_registers[0xF] = 0;
 
-        let start_loc = y_value * SCREEN_WIDTH as u16 + x_value;
+        let start_loc = y_value * self.screen_width as u16 + x_value;
 
         // For each row in the sprite
         for i in 0..height {
@@ -400,9 +430,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 break;
             };
 
-            let current_loc = start_loc + SCREEN_WIDTH as u16 * i as u16;
+            let current_loc = start_loc + self.screen_width as u16 * i as u16;
 
-            if y_value + i as u16 > (SCREEN_HEIGHT - 1) as u16 {
+            if y_value + i as u16 > (self.screen_height - 1) as u16 {
                 if self.quirks.clipping {
                     continue;
                 } else {
@@ -414,7 +444,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 let mut overdrawn_x = false;
                 let mask: u8 = 0b10000000 >> j;
 
-                if (x_value + j) > (SCREEN_WIDTH - 1) as u16 {
+                if (x_value + j) > (self.screen_width - 1) as u16 {
                     if self.quirks.clipping {
                         continue;
                     } else {
@@ -428,14 +458,14 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 // Because we working with a flattened array, lol
                 // subract one row to keep alignment of the px
                 if overdrawn_x {
-                    to_get_index -= SCREEN_WIDTH as u16;
+                    to_get_index -= self.screen_width as u16;
                 }
 
                 // NOTE: Only in Quirks.clipping
                 // If we go off the bottom of the screen, subract an entire screen
                 // to get back to the top
                 if overdrawn_y {
-                    to_get_index -= (SCREEN_WIDTH * SCREEN_HEIGHT) as u16;
+                    to_get_index -= (self.screen_width * self.screen_height) as u16;
                 }
 
                 if let Some(x) = self.screen_buffer.get_mut((to_get_index) as usize) {
@@ -448,7 +478,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 }
             }
         }
+        self.wait_to_display();
+        self.drawer
+            .draw_buffer(&self.screen_buffer, self.screen_width, self.screen_height);
+    }
 
+    fn wait_to_display(&mut self) {
         if self.quirks.disp_wait {
             let now = SystemTime::now();
             let time_since_last_draw = now
@@ -460,7 +495,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             }
             self.last_draw = SystemTime::now();
         }
-        self.drawer.draw_buffer(&self.screen_buffer);
     }
 
     fn clear_screen(&mut self) {
@@ -570,7 +604,7 @@ mod tests {
     struct DummyInput;
     struct DebugDrawer;
     impl Draw for DebugDrawer {
-        fn draw_buffer(&mut self, _screen_buf: &[u8]) {}
+        fn draw_buffer(&mut self, _: &[u8], _: usize, _: usize) {}
         fn clear_screen(&mut self) {}
     }
     impl ReadInputState for DummyInput {

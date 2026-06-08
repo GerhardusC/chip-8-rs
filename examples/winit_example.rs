@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use chip_eight::{Draw, Emulator, QuirksMode, ReadInputState, SCREEN_HEIGHT, SCREEN_WIDTH};
+use chip_eight::{Draw, Emulator, QuirksMode, ReadInputState};
 use softbuffer::{Context, Surface};
 use winit::{
     application::ApplicationHandler,
@@ -33,8 +33,10 @@ const SCALE_FACTOR: usize = 10;
 impl Draw for DisplayOutput {
     // This function will be called by the emulator whenever the draw function is encountered. Its
     // simply a buffer of 1s and 0s.
-    fn draw_buffer(&mut self, screen_buf: &[u8]) {
-        let _ = self.buffer_sender.send(screen_buf.to_vec());
+    fn draw_buffer(&mut self, screen_buf: &[u8], screen_width: usize, screen_height: usize) {
+        let _ = self
+            .buffer_sender
+            .send((screen_buf.to_vec(), screen_width, screen_height));
     }
 
     fn clear_screen(&mut self) {}
@@ -58,14 +60,14 @@ struct KeyboardInput {
 }
 
 struct DisplayOutput {
-    buffer_sender: Sender<Vec<u8>>,
+    buffer_sender: Sender<(Vec<u8>, usize, usize)>,
 }
 
 struct App {
     context: Context<OwnedDisplayHandle>,
     app_state: AppState,
     keys: Arc<[AtomicU8; 16]>,
-    buffer_receiver: Receiver<Vec<u8>>,
+    buffer_receiver: Receiver<(Vec<u8>, usize, usize)>,
 }
 
 enum AppState {
@@ -208,24 +210,27 @@ impl ApplicationHandler for App {
                 winit::keyboard::PhysicalKey::Unidentified(_native_key_code) => {}
             },
             WindowEvent::RedrawRequested => {
-                let _ = surface.resize(
-                    NonZeroU32::new((SCREEN_WIDTH * SCALE_FACTOR) as u32)
-                        .expect("Definitely non zero"),
-                    NonZeroU32::new((SCREEN_HEIGHT * SCALE_FACTOR) as u32)
-                        .expect("Definitely non zero"),
-                );
-                let mut buffer = surface.buffer_mut().expect("Failed to get screen buffer");
-
-                if let Ok(draw_buffer) = self.buffer_receiver.recv_timeout(Duration::from_millis(6))
+                if let Ok((draw_buffer, screen_width, screen_height)) =
+                    self.buffer_receiver.recv_timeout(Duration::from_millis(6))
                 {
+                    let _ = surface.resize(
+                        NonZeroU32::new((screen_width * SCALE_FACTOR) as u32)
+                            .expect("Definitely non zero"),
+                        NonZeroU32::new((screen_height * SCALE_FACTOR) as u32)
+                            .expect("Definitely non zero"),
+                    );
+                    let mut buffer = surface.buffer_mut().expect("Failed to get screen buffer");
+
                     let expanded_buf =
-                        expand_buffer(draw_buffer.as_slice(), SCALE_FACTOR as u8, SCREEN_WIDTH);
+                        expand_buffer(draw_buffer.as_slice(), SCALE_FACTOR as u8, screen_width);
                     if expanded_buf.len() < buffer.len() {
                         eprintln!("Buffer too big");
                         return;
                     }
                     for (i, x) in buffer.iter_mut().enumerate() {
-                        *x = expanded_buf[i];
+                        if let Some(j) = expanded_buf.get(i) {
+                            *x = *j;
+                        }
                     }
                     buffer.present().expect("Failed to present buffer");
                 }

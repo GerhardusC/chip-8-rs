@@ -6,11 +6,11 @@ mod utils;
 pub use emulator::*;
 pub use utils::*;
 
-pub const SCREEN_WIDTH: usize = 64;
-pub const SCREEN_HEIGHT: usize = 32;
+pub const BASE_SCREEN_WIDTH: usize = 64;
+pub const BASE_SCREEN_HEIGHT: usize = 32;
 
 pub trait Draw {
-    fn draw_buffer(&mut self, screen_buf: &[u8]);
+    fn draw_buffer(&mut self, screen_buf: &[u8], screen_width: usize, screen_height: usize);
     fn clear_screen(&mut self);
 }
 
