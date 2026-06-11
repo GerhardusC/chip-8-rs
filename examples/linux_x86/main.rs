@@ -30,7 +30,7 @@ cargo run --example linux_x86 /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
-    Emulator::init(program, Drawer::init(), InputListener::init())?.run();
+    Emulator::init(program, Drawer::init(), InputListener::init())?.run_blocking();
 
     Ok(())
 }

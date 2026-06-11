@@ -87,7 +87,7 @@ impl From<u16> for Instruction {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
     // 00E0 (clear screen)
     ClearScreen,
@@ -165,7 +165,7 @@ pub enum Instruction {
     Error(u16),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum KeyStateToCheck {
     IsPressed,
     NotPressed,

@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LogicalOperator {
     // 8XY0: Set
     // VX is set to the value of VY.
@@ -27,7 +27,7 @@ pub enum LogicalOperator {
     Invalid,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Direction {
     Left,
     Right,

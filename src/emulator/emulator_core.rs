@@ -81,6 +81,23 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         emulator.set_mem_block(&program, 0x200)?;
         emulator.set_font(&FONT)?;
 
+        let delay_timer = emulator.delay_timer.clone();
+        let sound_timer = emulator.sound_timer.clone();
+        std::thread::spawn(move || {
+            loop {
+                let old_val = delay_timer.load(Ordering::Relaxed);
+                if old_val > 0 {
+                    delay_timer.store(old_val - 1, Ordering::Relaxed);
+                }
+
+                let old_val = sound_timer.load(Ordering::Relaxed);
+                if old_val > 0 {
+                    sound_timer.store(old_val - 1, Ordering::Relaxed);
+                }
+                std::thread::sleep(Duration::from_millis(6));
+            }
+        });
+
         Ok(emulator)
     }
 
@@ -550,84 +567,44 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         Ok(())
     }
 
-    pub fn debug(&mut self) {
-        let mut prev_index_register = self.index_register;
-        let mut prev_program_counter = self.program_counter;
-        let mut prev_stack = format!("{:?}", self.stack);
-        let mut prev_memory = format!("{:?}", self.memory);
-        let mut prev_varaible_registers = format!("{:?}", self.variable_registers);
-        let mut prev_screen_buffer = format!("{:?}", self.screen_buffer);
-
+    pub fn run_blocking(&mut self) {
         loop {
             let instruction = self.fetch();
-            dbg!(&instruction);
             self.execute(instruction);
-
-            let index_register = self.index_register;
-            if prev_index_register != index_register {
-                dbg!(&index_register);
-                prev_index_register = index_register;
-            }
-            let program_counter = self.program_counter;
-            if prev_program_counter != program_counter {
-                dbg!(&program_counter);
-                prev_program_counter = program_counter;
-            }
-            let stack = format!("{:?}", &self.stack);
-            if prev_stack != stack {
-                dbg!(&stack);
-                prev_stack = stack;
-            }
-            let memory = format!("{:?}", self.memory);
-            if prev_memory != memory {
-                println!("Memory updated");
-                prev_memory = memory;
-            }
-            let varaible_registers = format!("{:?}", self.variable_registers);
-            if prev_varaible_registers != varaible_registers {
-                dbg!(&varaible_registers);
-                prev_varaible_registers = varaible_registers;
-            }
-            let screen_buffer = format!("{:?}", self.screen_buffer);
-            if prev_screen_buffer != screen_buffer {
-                dbg!("Screen_updated");
-                prev_screen_buffer = screen_buffer;
-            }
-
-            println!("Next instruction: 'n'");
-            let mut res = String::new();
-            let Ok(_) = std::io::stdin().read_line(&mut res) else {
-                break;
-            };
-            if res.trim() != "q" {
-                continue;
-            } else {
-                break;
-            }
         }
     }
+}
 
-    pub fn run(&mut self) {
-        let delay_timer = self.delay_timer.clone();
-        let sound_timer = self.sound_timer.clone();
-        std::thread::spawn(move || {
-            loop {
-                let old_val = delay_timer.load(Ordering::Relaxed);
-                if old_val > 0 {
-                    delay_timer.store(old_val - 1, Ordering::Relaxed);
-                }
+// I don't know if I should add the delay timers and stuff here, but everything else seems pretty
+// useful for a debugger.
+#[derive(Debug)]
+pub struct EmulatorState {
+    pub memory: [u8; 0x1000],
+    pub font_addr: usize,
+    pub stack: Vec<usize>,
+    pub variable_registers: [u8; 16],
+    pub screen_buffer: Vec<u8>,
+    pub index_register: usize,
+    pub program_counter: usize,
+    pub last_instruction: Instruction,
+}
 
-                let old_val = sound_timer.load(Ordering::Relaxed);
-                if old_val > 0 {
-                    sound_timer.store(old_val - 1, Ordering::Relaxed);
-                }
-                std::thread::sleep(Duration::from_millis(6));
-            }
-        });
-        loop {
-            let instruction = self.fetch();
-            self.execute(instruction);
-        }
+impl<T: Draw, P: ReadInputState> Iterator for Emulator<T, P> {
+    type Item = EmulatorState;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let instruction = self.fetch();
+        self.execute(instruction.clone());
+        Some(EmulatorState {
+            last_instruction: instruction,
+            memory: self.memory,
+            font_addr: self.font_addr,
+            stack: self.stack.clone(),
+            variable_registers: self.variable_registers,
+            screen_buffer: self.screen_buffer.clone(),
+            index_register: self.index_register,
+            program_counter: self.program_counter,
+        })
     }
 }
 

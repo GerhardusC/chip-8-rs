@@ -67,7 +67,58 @@ cargo run --example debug_example /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
-    Emulator::init(program, DebugDrawer, DummyInput)?.debug();
+    let emulator = Emulator::init(program, DebugDrawer, DummyInput)?;
+
+    let mut prev_index_register = 0;
+    let mut prev_program_counter = 0;
+    let mut prev_stack = String::new();
+    let mut prev_memory = String::new();
+    let mut prev_varaible_registers = String::new();
+    let mut prev_screen_buffer = String::new();
+
+    for emulator_state in emulator {
+        let index_register = emulator_state.index_register;
+        if prev_index_register != index_register {
+            dbg!(&index_register);
+            prev_index_register = index_register;
+        }
+        let program_counter = emulator_state.program_counter;
+        if prev_program_counter != program_counter {
+            dbg!(&program_counter);
+            prev_program_counter = program_counter;
+        }
+        let stack = format!("{:?}", &emulator_state.stack);
+        if prev_stack != stack {
+            dbg!(&stack);
+            prev_stack = stack;
+        }
+        let memory = format!("{:?}", emulator_state.memory);
+        if prev_memory != memory {
+            println!("Memory updated");
+            prev_memory = memory;
+        }
+        let varaible_registers = format!("{:?}", emulator_state.variable_registers);
+        if prev_varaible_registers != varaible_registers {
+            dbg!(&varaible_registers);
+            prev_varaible_registers = varaible_registers;
+        }
+        let screen_buffer = format!("{:?}", emulator_state.screen_buffer);
+        if prev_screen_buffer != screen_buffer {
+            dbg!("Screen_updated");
+            prev_screen_buffer = screen_buffer;
+        }
+
+        println!("Next instruction: 'n'");
+        let mut res = String::new();
+        let Ok(_) = std::io::stdin().read_line(&mut res) else {
+            break;
+        };
+        if res.trim() != "q" {
+            continue;
+        } else {
+            break;
+        }
+    }
 
     Ok(())
 }

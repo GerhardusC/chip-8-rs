@@ -284,7 +284,7 @@ cargo run --example winit_example /path/to/chip8/program.c8
             .expect("Program too large")
             .set_max_draw_delay(Duration::from_millis(7))
             .set_quirks_mode(QuirksMode::Chip8)
-            .run();
+            .run_blocking();
     });
 
     let event_loop = EventLoop::new()?;
