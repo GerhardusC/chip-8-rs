@@ -488,12 +488,29 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
 
         let start_loc = y_value * self.screen_width as u16 + x_value;
 
+        let (width, height) = { if height == 0 { (16, 16) } else { (8, height) } };
+
         // For each row in the sprite
         for i in 0..height {
             let mut overdrawn_y = false;
-            let wrapped_mem_index = (self.index_register + i as usize) % self.memory.len();
-            let Some(sprite_row) = self.memory.get(wrapped_mem_index) else {
-                break;
+            let sprite_row = if width == 8 {
+                let wrapped_mem_index = (self.index_register + i as usize) % self.memory.len();
+                let Some(sprite_row) = self.memory.get(wrapped_mem_index) else {
+                    break;
+                };
+                *sprite_row as u16
+            } else {
+                let wrapped_mem_index_first_half =
+                    (self.index_register + (i * 2) as usize) % self.memory.len();
+                let Some(sprite_left_half) = self.memory.get(wrapped_mem_index_first_half) else {
+                    break;
+                };
+                let wrapped_mem_index_second_half =
+                    (self.index_register + (i * 2 + 1) as usize) % self.memory.len();
+                let Some(sprite_right_half) = self.memory.get(wrapped_mem_index_second_half) else {
+                    break;
+                };
+                (*sprite_left_half as u16) << 8 | *sprite_right_half as u16
             };
 
             let current_loc = start_loc + self.screen_width as u16 * i as u16;
@@ -506,9 +523,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 }
             }
             // For each pixel in the row
-            for j in 0..8 {
+            for j in 0..width {
                 let mut overdrawn_x = false;
-                let mask: u8 = 0b10000000 >> j;
+                let mask: u16 = 0b1 << (width - j - 1);
 
                 if (x_value + j) > (self.screen_width - 1) as u16 {
                     if self.quirks.clipping {
