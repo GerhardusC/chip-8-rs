@@ -101,6 +101,23 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         Ok(emulator)
     }
 
+    pub fn reset(&mut self, program: Vec<u8>) -> Result<(), ApplicationError> {
+        self.set_mem_block(&program, 0x200)?;
+        self.memory = [0; 0x1000];
+        self.stack = vec![];
+        self.variable_registers = [0; 16];
+        self.screen_buffer = vec![0; BASE_SCREEN_WIDTH * BASE_SCREEN_HEIGHT];
+        self.font_addr = 0x50;
+        self.index_register = 0;
+        self.program_counter = 0x200;
+        self.max_draw_delay = Duration::from_millis(7);
+        self.last_draw = SystemTime::now();
+        self.quirks = QuirksMode::Chip8.into();
+        self.screen_width = 64;
+        self.screen_height = 32;
+        Ok(())
+    }
+
     pub fn set_quirks_mode(&mut self, quirks_mode: QuirksMode) -> &mut Self {
         self.quirks = quirks_mode.into();
         self
