@@ -102,7 +102,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     }
 
     pub fn reset(&mut self, program: Vec<u8>) -> Result<(), ApplicationError> {
-        self.set_mem_block(&program, 0x200)?;
         self.memory = [0; 0x1000];
         self.stack = vec![];
         self.variable_registers = [0; 16];
@@ -115,6 +114,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         self.quirks = QuirksMode::Chip8.into();
         self.screen_width = 64;
         self.screen_height = 32;
+        self.set_mem_block(&program, 0x200)?;
         Ok(())
     }
 

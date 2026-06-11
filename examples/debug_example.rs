@@ -67,7 +67,7 @@ cargo run --example debug_example /path/to/chip8/program.c8
         std::process::exit(2);
     };
 
-    let emulator = Emulator::init(program, DebugDrawer, DummyInput)?;
+    let mut emulator = Emulator::init(program.clone(), DebugDrawer, DummyInput)?;
 
     let mut prev_index_register = 0;
     let mut prev_program_counter = 0;
@@ -76,7 +76,11 @@ cargo run --example debug_example /path/to/chip8/program.c8
     let mut prev_varaible_registers = String::new();
     let mut prev_screen_buffer = String::new();
 
-    for emulator_state in emulator {
+    loop {
+        let emulator_state = emulator
+            .next()
+            .expect("There will always be a next instruction");
+
         let index_register = emulator_state.index_register;
         if prev_index_register != index_register {
             dbg!(&index_register);
@@ -113,6 +117,17 @@ cargo run --example debug_example /path/to/chip8/program.c8
         let Ok(_) = std::io::stdin().read_line(&mut res) else {
             break;
         };
+        match res.trim() {
+            "r" => {
+                emulator.reset(program.clone()).expect("Program too large");
+            }
+            "q" => {
+                break;
+            }
+            _ => {
+                continue;
+            }
+        }
         if res.trim() != "q" {
             continue;
         } else {
