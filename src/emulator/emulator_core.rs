@@ -318,7 +318,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.index_register += self.variable_registers[register] as usize;
             }
             SubCommand::GetFontCharacter(FontVariant::Small) => {
-                self.index_register = FONT_ADDR + (self.variable_registers[register]) as usize * 5;
+                self.index_register =
+                    FONT_ADDR + (self.variable_registers[register] & 0xF) as usize * 5;
             }
             SubCommand::GetFontCharacter(FontVariant::Big) => {
                 self.index_register =
