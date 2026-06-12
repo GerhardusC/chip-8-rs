@@ -61,9 +61,9 @@ The emulator will block the current thread, so do make sure you do the input han
 
 ## References
 
-[Chip 8 test suite](https://github.com/Timendus/chip8-test-suite/tree/main)
-[Tuturial on how to build a Chip 8 interpreter](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/)
-[How I finally found out how to do the drawing properly](https://www.laurencescotford.net/2020/07/19/chip-8-on-the-cosmac-vip-drawing-sprites/)
-[Where I stole winit example state enum idea](https://github.com/rust-windowing/softbuffer/)
-[Where to find some games to test](https://johnearnest.github.io/chip8Archive/) (Only the top ones I think so far)
+- [Chip 8 test suite](https://github.com/Timendus/chip8-test-suite/tree/main)
+- [Tuturial on how to build a Chip 8 interpreter](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/)
+- [How I finally found out how to do the drawing properly](https://www.laurencescotford.net/2020/07/19/chip-8-on-the-cosmac-vip-drawing-sprites/)
+- [Where I stole winit example state enum idea](https://github.com/rust-windowing/softbuffer/)
+- [Where to find some games to test](https://johnearnest.github.io/chip8Archive/) (Only the top ones I think so far)
 
