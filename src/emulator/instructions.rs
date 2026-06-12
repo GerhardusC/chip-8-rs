@@ -4,20 +4,15 @@ impl From<u16> for Instruction {
     fn from(value: u16) -> Self {
         match value >> 12 {
             0x0 if value == 0x00EE => Self::Return,
-            // 00E0 (clear screen)
             0x0 if value == 0x00E0 => Self::ClearScreen,
-
             0x0 if value == 0x00FF => Self::SetHiRes,
             0x0 if value == 0x00FE => Self::SetLoRes,
-
             0x0 if value == 0x00FB => Self::ScrollRight,
             0x0 if value == 0x00FC => Self::ScrollLeft,
-
             0x0 if value & 0x00F0 == 0x00C0 => Self::ScrollDown {
                 amount: (value & 0xF) as u8,
             },
             0x0 => Self::Unimplemented(value),
-            // 1NNN (jump)
             0x1 => Self::Jump(0x0FFF & value),
             0x2 => Self::Call((0x0FFF & value) as usize),
             0x3 => Self::SkipEqValueWithRegisterContents {
@@ -32,12 +27,10 @@ impl From<u16> for Instruction {
                 register_x: (value & 0x0F00) as usize >> 8,
                 register_y: (value & 0x00F0) as usize >> 4,
             },
-            // 6XNN (set register VX)
             0x6 => Self::SetGeneralRegister {
                 register: (0xF00 & value) as usize >> 8,
                 value: (0xFF & value) as u8,
             },
-            // 7XNN (add value to register VX)
             0x7 => Self::AddToRegister {
                 register: (0xF00 & value) as usize >> 8,
                 value: (0xFF & value) as u8,
@@ -51,9 +44,7 @@ impl From<u16> for Instruction {
                 register_x: (value & 0x0F00) as usize >> 8,
                 register_y: (value & 0x00F0) as usize >> 4,
             },
-            // ANNN (set index register I)
             0xA => Self::SetIndexRegister(0xFFF & value),
-            // BNNN: Jump with offset
             0xB => Self::JumpWithOffset {
                 register_x: (value & 0x0F00) as usize >> 8,
                 address: (value & 0x0FFF) as usize,
@@ -62,7 +53,6 @@ impl From<u16> for Instruction {
                 register_x: (value & 0x0F00) as usize >> 8,
                 val_to_and: (value & 0x00FF) as u8,
             },
-            // DXYN (display/draw)
             0xD => Self::Draw {
                 x_register: (0xF00 & value) as usize >> 8,
                 y_register: (0xF0 & value) as usize >> 4,
@@ -76,7 +66,6 @@ impl From<u16> for Instruction {
                     _ => KeyStateToCheck::Invalid,
                 },
             },
-            // FNNN
             0xF => Self::SubCommand {
                 register: (0xF00 & value) as usize >> 8,
                 command: SubCommand::from(value),
@@ -90,27 +79,19 @@ impl From<u16> for Instruction {
 }
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    // 00E0 (clear screen)
     ClearScreen,
-    // 00EE (return)
     Return,
-    // 2NNN (Subroutine)
     Call(usize),
-    // 1NNN (jump)
     Jump(u16),
-    // 6XNN (set register VX)
     SetIndexRegister(u16),
-    // 7XNN (add value to register VX)
     SetGeneralRegister {
         register: usize,
         value: u8,
     },
-    // ANNN (set index register I)
     AddToRegister {
         register: usize,
         value: u8,
     },
-    // DXYN (display/draw)
     Draw {
         x_register: usize,
         y_register: usize,
