@@ -10,7 +10,6 @@ pub enum SuperChipBehaviour {
 pub enum QuirksMode {
     Chip8,
     SuperChip(SuperChipBehaviour),
-    XOChip,
 }
 
 #[derive(Debug)]
@@ -18,6 +17,8 @@ pub struct QuirksFields {
     pub vf_reset: bool,
     pub memory: bool,
     // NOTE: I actually don't understand what this is supposed to do
+    // I have read https://github.com/Timendus/chip8-test-suite/blob/main/legacy-superchip.md
+    // but don't seem to be getting it.
     pub disp_wait: bool,
     pub clipping: bool,
     pub shifting: bool,
@@ -52,14 +53,6 @@ impl From<QuirksMode> for QuirksFields {
                     shifting: true,
                     jumping: true,
                 },
-            },
-            QuirksMode::XOChip => QuirksFields {
-                vf_reset: false,
-                memory: true,
-                disp_wait: false,
-                clipping: false,
-                shifting: false,
-                jumping: false,
             },
         }
     }
