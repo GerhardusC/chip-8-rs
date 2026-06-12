@@ -220,7 +220,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.program_counter = memory_addr;
             }
             Instruction::SubCommand { register, command } => {
-                self.perform_f_command(command, register)
+                self.perform_sub_command(command, register)
             }
             Instruction::SkipIfKey {
                 register,
@@ -301,7 +301,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         };
     }
 
-    fn perform_f_command(&mut self, command: SubCommand, register: usize) {
+    fn perform_sub_command(&mut self, command: SubCommand, register: usize) {
         match command {
             SubCommand::ReadDelayTimer => {
                 self.variable_registers[register] = self.delay_timer.load(Ordering::Relaxed) as u8;

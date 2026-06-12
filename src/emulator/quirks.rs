@@ -1,11 +1,9 @@
-#[allow(unused)]
 #[derive(Debug)]
 pub enum SuperChipBehaviour {
     Modern,
     Legacy,
 }
 
-#[allow(unused)]
 #[derive(Debug)]
 pub enum QuirksMode {
     Chip8,
