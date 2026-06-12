@@ -35,15 +35,25 @@ Once you have implemented your traits you just need to call `init` and `run` on 
     let drawer = Drawer::init();
     let input_reader = InputReader::init();
 
-    let emulator = chip_eight::Emulator::init(program, drawer, input_reader)
+    let mut emulator = chip_eight::Emulator::init(program, drawer, input_reader)
         .expect("The chip 8 program is probably too large")
         // Optionally you can set a couple of internal settings for the interpreter, these are the defaults
         // If the display quirk is enabled, this is how long it will wait minimum before requesting another draw
         .set_max_draw_delay(Duration::from_millis(6))
-        // This is how to set quirks mode, options: Chip8, SuperChip(Modern|Legacy), XOChip.
-        .set_quirks_mode(QuirksMode::Chip8)
-        .run();
+        // This is how to set quirks mode, options: Chip8, SuperChip(Modern|Legacy)
+        .set_quirks_mode(QuirksMode::Chip8);
+
+    // Most simply you can then run the emulator as follows:
+    emulator.run_blocking();
+
+
+    // You could iterate through the interpreter if you want.
+    for emulator_state in emulator {
+        // Here emulator_state gives you access to the previous instruction as well as 
+    }
+
 ```
+
 
 ## Notes
 
@@ -53,7 +63,7 @@ The emulator will block the current thread, so do make sure you do the input han
 
 [Chip 8 test suite](https://github.com/Timendus/chip8-test-suite/tree/main)
 [Tuturial on how to build a Chip 8 interpreter](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/)
-[How I finally found out how to do the drawing properly, mostly](https://www.laurencescotford.net/2020/07/19/chip-8-on-the-cosmac-vip-drawing-sprites/)
+[How I finally found out how to do the drawing properly](https://www.laurencescotford.net/2020/07/19/chip-8-on-the-cosmac-vip-drawing-sprites/)
 [Where I stole winit example state enum idea](https://github.com/rust-windowing/softbuffer/)
 [Where to find some games to test](https://johnearnest.github.io/chip8Archive/) (Only the top ones I think so far)
 
