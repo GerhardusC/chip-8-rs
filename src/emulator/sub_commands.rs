@@ -7,7 +7,7 @@ pub enum SubCommand {
 
     // Aux
     AddToIndexRegister,
-    GetFontCharacter,
+    GetFontCharacter(FontVariant),
     DecimalConversion,
 
     // Memory
@@ -20,6 +20,12 @@ pub enum SubCommand {
     Unimplemented(u16),
 }
 
+#[derive(Debug, Clone)]
+pub enum FontVariant {
+    Big,
+    Small,
+}
+
 impl From<u16> for SubCommand {
     fn from(value: u16) -> Self {
         match value & 0xFF {
@@ -30,7 +36,8 @@ impl From<u16> for SubCommand {
 
             // Aux
             0x1E => Self::AddToIndexRegister,
-            0x29 => Self::GetFontCharacter,
+            0x29 => Self::GetFontCharacter(FontVariant::Small),
+            0x20 => Self::GetFontCharacter(FontVariant::Big),
             0x33 => Self::DecimalConversion,
 
             // Memory

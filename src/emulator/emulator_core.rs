@@ -10,40 +10,20 @@ use std::{
 use crate::{
     ApplicationError, BASE_SCREEN_HEIGHT, BASE_SCREEN_WIDTH, Draw, ReadInputState,
     emulator::{
+        fonts::{BIG_FONT, BIG_FONT_ADDR, FONT, FONT_ADDR},
         instructions::{Instruction, KeyStateToCheck},
         logical_operator::{Direction, LogicalOperator},
         quirks::{QuirksFields, QuirksMode},
-        sub_commands::SubCommand,
+        sub_commands::{FontVariant, SubCommand},
     },
     u8_to_arr,
 };
-
-const FONT: [u8; 80] = [
-    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-    0x20, 0x60, 0x20, 0x20, 0x70, // 1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
-];
-
 #[derive(Debug)]
 pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
     stack: Vec<usize>,
     variable_registers: [u8; 16],
     screen_buffer: Vec<u8>,
-    font_addr: usize,
     index_register: usize,
     program_counter: usize,
     delay_timer: Arc<AtomicU16>,
@@ -64,7 +44,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             stack: vec![],
             variable_registers: [0; 16],
             screen_buffer: vec![0; BASE_SCREEN_WIDTH * BASE_SCREEN_HEIGHT],
-            font_addr: 0x50,
             index_register: 0,
             program_counter: 0x200,
             delay_timer: Arc::new(AtomicU16::new(0)),
@@ -79,7 +58,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         };
 
         emulator.set_mem_block(&program, 0x200)?;
-        emulator.set_font(&FONT)?;
+        emulator.set_mem_block(&FONT, FONT_ADDR)?;
+        emulator.set_mem_block(&BIG_FONT, BIG_FONT_ADDR)?;
 
         let delay_timer = emulator.delay_timer.clone();
         let sound_timer = emulator.sound_timer.clone();
@@ -106,7 +86,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         self.stack = vec![];
         self.variable_registers = [0; 16];
         self.screen_buffer = vec![0; BASE_SCREEN_WIDTH * BASE_SCREEN_HEIGHT];
-        self.font_addr = 0x50;
         self.index_register = 0;
         self.program_counter = 0x200;
         self.max_draw_delay = Duration::from_millis(7);
@@ -131,10 +110,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     pub fn set_max_draw_delay(&mut self, rate: Duration) -> &mut Self {
         self.max_draw_delay = rate;
         self
-    }
-
-    fn set_font(&mut self, font: &[u8]) -> Result<(), ApplicationError> {
-        self.set_mem_block(font, self.font_addr)
     }
 
     fn fetch(&mut self) -> Instruction {
@@ -341,9 +316,12 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             SubCommand::AddToIndexRegister => {
                 self.index_register += self.variable_registers[register] as usize;
             }
-            SubCommand::GetFontCharacter => {
+            SubCommand::GetFontCharacter(FontVariant::Small) => {
+                self.index_register = FONT_ADDR + (self.variable_registers[register]) as usize * 5;
+            }
+            SubCommand::GetFontCharacter(FontVariant::Big) => {
                 self.index_register =
-                    self.font_addr + ((self.variable_registers[register] & 0xF) as usize * 5);
+                    BIG_FONT_ADDR + (self.variable_registers[register]) as usize * 10;
             }
             SubCommand::DecimalConversion => {
                 let val = self.variable_registers[register];
@@ -614,7 +592,6 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
 #[derive(Debug)]
 pub struct EmulatorState {
     pub memory: [u8; 0x1000],
-    pub font_addr: usize,
     pub stack: Vec<usize>,
     pub variable_registers: [u8; 16],
     pub screen_buffer: Vec<u8>,
@@ -632,7 +609,6 @@ impl<T: Draw, P: ReadInputState> Iterator for Emulator<T, P> {
         Some(EmulatorState {
             last_instruction: instruction,
             memory: self.memory,
-            font_addr: self.font_addr,
             stack: self.stack.clone(),
             variable_registers: self.variable_registers,
             screen_buffer: self.screen_buffer.clone(),
@@ -666,7 +642,7 @@ mod tests {
                 .expect("All initial memory is in range");
 
         emulator
-            .set_font(&FONT)
+            .set_mem_block(&FONT, FONT_ADDR)
             .expect("Should be able to set font");
 
         // Clear

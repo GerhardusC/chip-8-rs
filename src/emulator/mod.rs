@@ -1,4 +1,5 @@
 mod emulator_core;
+mod fonts;
 mod instructions;
 mod logical_operator;
 mod quirks;
