@@ -160,10 +160,7 @@ pub enum Instruction {
     },
     ScrollRight,
     ScrollLeft,
-    #[allow(unused)]
     Unimplemented(u16),
-    #[allow(unused)]
-    Error(u16),
 }
 
 #[derive(Debug, Clone)]

@@ -276,8 +276,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     .collect();
                 self.screen_buffer = new_buffer;
             }
-            Instruction::Unimplemented(_) => {}
-            Instruction::Error(_) => {}
+            Instruction::Unimplemented(val) => {
+                eprintln!("UNIMPLEMENTED: {}", val)
+            }
         }
     }
 
@@ -545,17 +546,15 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     }
 
     fn wait_to_display(&mut self) {
-        if self.quirks.disp_wait {
-            let now = SystemTime::now();
-            let time_since_last_draw = now
-                .duration_since(self.last_draw)
-                .expect("Earlier is before now.");
+        let now = SystemTime::now();
+        let time_since_last_draw = now
+            .duration_since(self.last_draw)
+            .expect("Earlier is before now.");
 
-            if time_since_last_draw < self.max_draw_delay {
-                std::thread::sleep(self.max_draw_delay - time_since_last_draw);
-            }
-            self.last_draw = SystemTime::now();
+        if time_since_last_draw < self.max_draw_delay {
+            std::thread::sleep(self.max_draw_delay - time_since_last_draw);
         }
+        self.last_draw = SystemTime::now();
     }
 
     fn clear_screen(&mut self) {

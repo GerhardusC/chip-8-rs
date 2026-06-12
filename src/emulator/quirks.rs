@@ -13,11 +13,11 @@ pub enum QuirksMode {
     XOChip,
 }
 
-#[allow(unused)]
 #[derive(Debug)]
 pub struct QuirksFields {
     pub vf_reset: bool,
     pub memory: bool,
+    // NOTE: I actually don't understand what this is supposed to do
     pub disp_wait: bool,
     pub clipping: bool,
     pub shifting: bool,
@@ -25,7 +25,6 @@ pub struct QuirksFields {
 }
 
 impl From<QuirksMode> for QuirksFields {
-    // TODO: Double check these
     fn from(value: QuirksMode) -> Self {
         match value {
             QuirksMode::Chip8 => QuirksFields {
