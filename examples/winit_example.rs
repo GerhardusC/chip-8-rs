@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use chip_eight::{Draw, Emulator, QuirksMode, ReadInputState};
+use chip_eight::{Draw, Emulator, QuirksMode, ReadInputState, SuperChipBehaviour};
 use softbuffer::{Context, Surface};
 use winit::{
     application::ApplicationHandler,
@@ -283,7 +283,7 @@ cargo run --example winit_example /path/to/chip8/program.c8
         Emulator::init(program, display_output, keyboard_input)
             .expect("Program too large")
             .set_max_draw_delay(Duration::from_millis(7))
-            .set_quirks_mode(QuirksMode::Chip8)
+            .set_quirks_mode(QuirksMode::SuperChip(SuperChipBehaviour::Modern))
             .run_blocking();
     });
 

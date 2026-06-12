@@ -57,9 +57,9 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             screen_height: 32,
         };
 
-        emulator.set_mem_block(&program, 0x200)?;
         emulator.set_mem_block(&FONT, FONT_ADDR)?;
         emulator.set_mem_block(&BIG_FONT, BIG_FONT_ADDR)?;
+        emulator.set_mem_block(&program, 0x200)?;
 
         let delay_timer = emulator.delay_timer.clone();
         let sound_timer = emulator.sound_timer.clone();
