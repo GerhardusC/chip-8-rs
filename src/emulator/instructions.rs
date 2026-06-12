@@ -1,4 +1,4 @@
-use crate::emulator::{logical_operator::LogicalOperator, sub_commands::FCommand};
+use crate::emulator::{logical_operator::LogicalOperator, sub_commands::SubCommand};
 
 impl From<u16> for Instruction {
     fn from(value: u16) -> Self {
@@ -76,9 +76,10 @@ impl From<u16> for Instruction {
                     _ => KeyStateToCheck::Invalid,
                 },
             },
-            0xF => Self::FCommand {
+            // FNNN
+            0xF => Self::SubCommand {
                 register: (0xF00 & value) as usize >> 8,
-                command: FCommand::from(value),
+                command: SubCommand::from(value),
             },
 
             _ => unreachable!(
@@ -144,9 +145,9 @@ pub enum Instruction {
         register_x: usize,
         val_to_and: u8,
     },
-    FCommand {
+    SubCommand {
         register: usize,
-        command: FCommand,
+        command: SubCommand,
     },
     SkipIfKey {
         register: usize,

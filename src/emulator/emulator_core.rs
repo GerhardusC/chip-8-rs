@@ -13,7 +13,7 @@ use crate::{
         instructions::{Instruction, KeyStateToCheck},
         logical_operator::{Direction, LogicalOperator},
         quirks::{QuirksFields, QuirksMode},
-        sub_commands::FCommand,
+        sub_commands::SubCommand,
     },
     u8_to_arr,
 };
@@ -244,7 +244,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 self.stack.push(self.program_counter);
                 self.program_counter = memory_addr;
             }
-            Instruction::FCommand { register, command } => {
+            Instruction::SubCommand { register, command } => {
                 self.perform_f_command(command, register)
             }
             Instruction::SkipIfKey {
@@ -325,27 +325,27 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         };
     }
 
-    fn perform_f_command(&mut self, command: FCommand, register: usize) {
+    fn perform_f_command(&mut self, command: SubCommand, register: usize) {
         match command {
-            FCommand::ReadDelayTimer => {
+            SubCommand::ReadDelayTimer => {
                 self.variable_registers[register] = self.delay_timer.load(Ordering::Relaxed) as u8;
             }
-            FCommand::SetDelayTimer => {
+            SubCommand::SetDelayTimer => {
                 self.delay_timer
                     .store(self.variable_registers[register] as u16, Ordering::Relaxed);
             }
-            FCommand::SetSoundTimer => {
+            SubCommand::SetSoundTimer => {
                 self.sound_timer
                     .store(self.variable_registers[register] as u16, Ordering::Relaxed);
             }
-            FCommand::AddToIndexRegister => {
+            SubCommand::AddToIndexRegister => {
                 self.index_register += self.variable_registers[register] as usize;
             }
-            FCommand::GetFontCharacter => {
+            SubCommand::GetFontCharacter => {
                 self.index_register =
                     self.font_addr + ((self.variable_registers[register] & 0xF) as usize * 5);
             }
-            FCommand::DecimalConversion => {
+            SubCommand::DecimalConversion => {
                 let val = self.variable_registers[register];
                 let val = u8_to_arr(val);
 
@@ -356,7 +356,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     };
                 }
             }
-            FCommand::LoadFrom => {
+            SubCommand::LoadFrom => {
                 for (i, reg) in self.variable_registers[0..=register].iter_mut().enumerate() {
                     let wrapped = (self.index_register + i) % self.memory.len();
                     if let Some(x) = self.memory.get(wrapped) {
@@ -368,7 +368,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     self.index_register += register + 1;
                 }
             }
-            FCommand::StoreTo => {
+            SubCommand::StoreTo => {
                 for (i, reg) in self.variable_registers[0..=register].iter().enumerate() {
                     let wrapped = (self.index_register + i) % self.memory.len();
                     if let Some(x) = self.memory.get_mut(wrapped) {
@@ -379,7 +379,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     self.index_register += register + 1;
                 }
             }
-            FCommand::GetKey => {
+            SubCommand::GetKey => {
                 let mut key_pressed = false;
                 if let Ok(keys) = self.input_provider.read_keys_state() {
                     for (i, key) in keys.iter().enumerate() {
@@ -396,7 +396,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                     self.input_provider.reset_keys_state();
                 };
             }
-            FCommand::Unimplemented(_value) => {}
+            SubCommand::Unimplemented(_value) => {}
         }
     }
 

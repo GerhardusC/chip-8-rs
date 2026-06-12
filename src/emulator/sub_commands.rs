@@ -1,5 +1,5 @@
 #[derive(Debug, Clone)]
-pub enum FCommand {
+pub enum SubCommand {
     // Timers
     ReadDelayTimer,
     SetDelayTimer,
@@ -20,7 +20,7 @@ pub enum FCommand {
     Unimplemented(u16),
 }
 
-impl From<u16> for FCommand {
+impl From<u16> for SubCommand {
     fn from(value: u16) -> Self {
         match value & 0xFF {
             // Timers

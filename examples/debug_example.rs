@@ -81,6 +81,8 @@ cargo run --example debug_example /path/to/chip8/program.c8
             .next()
             .expect("There will always be a next instruction");
 
+        dbg!(&emulator_state.last_instruction);
+
         let index_register = emulator_state.index_register;
         if prev_index_register != index_register {
             dbg!(&index_register);
