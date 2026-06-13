@@ -86,7 +86,7 @@ pub trait ReadInputState {
 
 /// Currently the only ApplicationError variant is the program being too large to fit in the
 /// interpreter's memory.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ApplicationError {
     MemoryLocationOutOfRange { max_addr: usize },
 }

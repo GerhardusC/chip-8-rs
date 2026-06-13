@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// This is the main emulator interface, used to configure and run the interpreter.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
     stack: Vec<usize>,
@@ -603,7 +603,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
 
 /// Data that is returned after each iteration of the interpreter as long as it is running as an
 /// iterator.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EmulatorState {
     pub memory: [u8; 0x1000],
     pub stack: Vec<usize>,
@@ -612,6 +612,20 @@ pub struct EmulatorState {
     pub index_register: usize,
     pub program_counter: usize,
     pub last_instruction: Instruction,
+}
+
+impl Default for EmulatorState {
+    fn default() -> Self {
+        Self {
+            memory: [0; 0x1000],
+            last_instruction: Instruction::ClearScreen,
+            stack: Default::default(),
+            variable_registers: Default::default(),
+            screen_buffer: Default::default(),
+            index_register: Default::default(),
+            program_counter: Default::default(),
+        }
+    }
 }
 
 impl<T: Draw, P: ReadInputState> Iterator for Emulator<T, P> {

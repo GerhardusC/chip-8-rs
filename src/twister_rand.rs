@@ -16,7 +16,7 @@ const MT19937_F: u32 = 1812433253;
 const UMASK: u32 = 0xFFFFFFFF << SEPERATION_POINT;
 const LMASK: u32 = 0xFFFFFFFF >> (WORD_SIZE - SEPERATION_POINT);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MarsenneTwister32 {
     state_array: [u32; RECURRENCE as usize],
     x_sub_k: usize,

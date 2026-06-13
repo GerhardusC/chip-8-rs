@@ -1,19 +1,19 @@
 /// Modern or Legacy SuperChip behaviour, I can't get it to work entirely correctly.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SuperChipBehaviour {
     Modern,
     Legacy,
 }
 
 /// The preferred predefined set of behaviours.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum QuirksMode {
     Chip8,
     SuperChip(SuperChipBehaviour),
 }
 
 /// A customisable set of behaviours.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QuirksFields {
     pub vf_reset: bool,
     pub memory: bool,
