@@ -1,6 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 mod emulator;
+mod twister_rand;
 mod utils;
 
 pub use emulator::*;

@@ -16,6 +16,7 @@ use crate::{
         quirks::{QuirksFields, QuirksMode},
         sub_commands::{FontVariant, SubCommand},
     },
+    twister_rand::MarsenneTwister32,
     u8_to_arr,
 };
 #[derive(Debug)]
@@ -35,10 +36,15 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
     quirks: QuirksFields,
     screen_width: usize,
     screen_height: usize,
+    rng: MarsenneTwister32,
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     pub fn init(program: Vec<u8>, drawer: T, input_provider: P) -> Result<Self, ApplicationError> {
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Now is always after UNIX Epoch");
+
         let mut emulator = Self {
             memory: [0; 0x1000],
             stack: vec![],
@@ -55,6 +61,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
             quirks: QuirksMode::Chip8.into(),
             screen_width: 64,
             screen_height: 32,
+            rng: MarsenneTwister32::new((seed.as_micros() % u32::MAX as u128) as u32),
         };
 
         emulator.set_mem_block(&FONT, FONT_ADDR)?;
@@ -203,11 +210,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
                 register_x,
                 val_to_and,
             } => {
-                let randint = (std::time::SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Now is always after unix epoch")
-                    .as_micros()
-                    % 255) as u8;
+                let randint = (self.rng.generate() % 255) as u8;
                 self.variable_registers[register_x] = randint & val_to_and;
             }
             Instruction::Return => {

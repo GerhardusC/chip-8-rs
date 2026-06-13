@@ -7,7 +7,7 @@ fn pad_with_leading_zeroes(full_len: usize, input: &str) -> String {
     x += input;
     x
 }
-// TODO: Rewrite this more cleverly
+
 pub fn u8_to_arr(input: u8) -> [u8; 3] {
     let input = input.to_string();
     let items = pad_with_leading_zeroes(3, &input);
