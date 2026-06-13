@@ -41,14 +41,15 @@ impl MarsenneTwister32 {
 
     pub fn generate(&mut self) -> u32 {
         let x_sub_n_min_one: i32 = self.x_sub_k as i32 - (RECURRENCE - 1);
-        let x_sub_n_min_m = if x_sub_n_min_one < 0 {
+        // wrap at recurrence
+        let x_sub_n_min_one = if x_sub_n_min_one < 0 {
             x_sub_n_min_one + RECURRENCE
         } else {
             x_sub_n_min_one
-        }; // modulo n circular indexing
+        };
 
         let rhs_transformation: u32 = (self.state_array[self.x_sub_k] & UMASK)
-            | (self.state_array[x_sub_n_min_m as usize] & LMASK);
+            | (self.state_array[x_sub_n_min_one as usize] & LMASK);
 
         // xA Trnasformation:
         let x_lower_bit = rhs_transformation & 0b1;
