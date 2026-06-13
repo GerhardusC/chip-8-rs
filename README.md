@@ -37,17 +37,13 @@ Once you have implemented your traits you just need to call `init` and `run` on 
 
     let mut emulator = chip_eight::Emulator::init(program, drawer, input_reader)
         .expect("The chip 8 program is probably too large")
-        // Optionally you can set a couple of internal settings for the interpreter, these are the defaults
-        // If the display quirk is enabled, this is how long it will wait minimum before requesting another draw
         .set_max_draw_delay(Duration::from_millis(6))
-        // This is how to set quirks mode, options: Chip8, SuperChip(Modern|Legacy)
         .set_quirks_mode(QuirksMode::Chip8);
 
-    // Most simply you can then run the emulator as follows:
+    // Most simply you can then run the emulator:
     emulator.run_blocking();
 
-
-    // You could iterate through the interpreter if you want.
+    // You could also iterate through the interpreter if you want.
     for emulator_state in emulator {
         // Here emulator_state gives you access to the previous instruction as well as 
     }

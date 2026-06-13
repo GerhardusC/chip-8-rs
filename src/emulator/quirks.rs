@@ -1,15 +1,18 @@
+/// Modern or Legacy SuperChip behaviour, I can't get it to work entirely correctly.
 #[derive(Debug)]
 pub enum SuperChipBehaviour {
     Modern,
     Legacy,
 }
 
+/// The preferred predefined set of behaviours.
 #[derive(Debug)]
 pub enum QuirksMode {
     Chip8,
     SuperChip(SuperChipBehaviour),
 }
 
+/// A customisable set of behaviours.
 #[derive(Debug)]
 pub struct QuirksFields {
     pub vf_reset: bool,

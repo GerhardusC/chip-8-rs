@@ -17,8 +17,10 @@ use crate::{
         sub_commands::{FontVariant, SubCommand},
     },
     twister_rand::MarsenneTwister32,
-    u8_to_arr,
+    utils::u8_to_arr,
 };
+
+/// This is the main emulator interface, used to configure and run the interpreter.
 #[derive(Debug)]
 pub struct Emulator<T: Draw, P: ReadInputState> {
     memory: [u8; 0x1000],
@@ -40,6 +42,8 @@ pub struct Emulator<T: Draw, P: ReadInputState> {
 }
 
 impl<T: Draw, P: ReadInputState> Emulator<T, P> {
+    /// Init could I guess also have been named 'new()', but it just returns an instance of the
+    /// interpreter/emulator.
     pub fn init(program: Vec<u8>, drawer: T, input_provider: P) -> Result<Self, ApplicationError> {
         let seed = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -88,6 +92,16 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         Ok(emulator)
     }
 
+    /// Run the emulator/interpreter on the current thread in a busy loop.
+    /// The drawing speed is purely determined by the max draw delay
+    pub fn run_blocking(&mut self) {
+        loop {
+            let instruction = self.fetch();
+            self.execute(instruction);
+        }
+    }
+
+    /// Reset the emulator's state to its initial state.
     pub fn reset(&mut self, program: Vec<u8>) -> Result<(), ApplicationError> {
         self.memory = [0; 0x1000];
         self.stack = vec![];
@@ -104,16 +118,20 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         Ok(())
     }
 
+    /// Set the quirks mode to a predefined behaviour (I'm not sure how consistent this is)
     pub fn set_quirks_mode(&mut self, quirks_mode: QuirksMode) -> &mut Self {
         self.quirks = quirks_mode.into();
         self
     }
 
+    /// Set only specific flags for quirks to be followed (I'm not sure how consistent this is)
     pub fn with_custom_quirks(&mut self, quirks: QuirksFields) -> &mut Self {
         self.quirks = quirks;
         self
     }
 
+    /// Set the amount of time the interpreter will wait before drawing to the screen. I.E. draw to
+    /// screen rate.
     pub fn set_max_draw_delay(&mut self, rate: Duration) -> &mut Self {
         self.max_draw_delay = rate;
         self
@@ -581,17 +599,10 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         }
         Ok(())
     }
-
-    pub fn run_blocking(&mut self) {
-        loop {
-            let instruction = self.fetch();
-            self.execute(instruction);
-        }
-    }
 }
 
-// I don't know if I should add the delay timers and stuff here, but everything else seems pretty
-// useful for a debugger.
+/// Data that is returned after each iteration of the interpreter as long as it is running as an
+/// iterator.
 #[derive(Debug)]
 pub struct EmulatorState {
     pub memory: [u8; 0x1000],
