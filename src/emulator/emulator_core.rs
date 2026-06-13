@@ -140,7 +140,7 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
     fn fetch(&mut self) -> Instruction {
         let tophalf = self.memory[self.program_counter];
         let bothalf = self.memory[self.program_counter + 1];
-        self.program_counter += 2;
+        self.program_counter = (self.program_counter + 2) % self.memory.len();
         (((tophalf as u16) << 8) | bothalf as u16).into()
     }
 
