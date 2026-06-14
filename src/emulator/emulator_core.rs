@@ -114,6 +114,8 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         self.quirks = QuirksMode::Chip8.into();
         self.screen_width = 64;
         self.screen_height = 32;
+        self.set_mem_block(&FONT, FONT_ADDR)?;
+        self.set_mem_block(&BIG_FONT, BIG_FONT_ADDR)?;
         self.set_mem_block(&program, 0x200)?;
         Ok(())
     }
@@ -612,6 +614,10 @@ pub struct EmulatorState {
     pub index_register: usize,
     pub program_counter: usize,
     pub last_instruction: Instruction,
+    pub delay_timer: u16,
+    pub sound_timer: u16,
+    pub width: usize,
+    pub height: usize,
 }
 
 impl Default for EmulatorState {
@@ -624,6 +630,10 @@ impl Default for EmulatorState {
             screen_buffer: Default::default(),
             index_register: Default::default(),
             program_counter: Default::default(),
+            delay_timer: Default::default(),
+            sound_timer: Default::default(),
+            width: BASE_SCREEN_WIDTH,
+            height: BASE_SCREEN_HEIGHT,
         }
     }
 }
@@ -642,6 +652,10 @@ impl<T: Draw, P: ReadInputState> Iterator for Emulator<T, P> {
             screen_buffer: self.screen_buffer.clone(),
             index_register: self.index_register,
             program_counter: self.program_counter,
+            delay_timer: self.delay_timer.load(Ordering::Relaxed),
+            sound_timer: self.sound_timer.load(Ordering::Relaxed),
+            width: self.screen_width,
+            height: self.screen_height,
         })
     }
 }

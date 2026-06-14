@@ -12,8 +12,6 @@ impl Draw for DebugDrawer {
             .join("\n");
         println!("{}", x);
     }
-
-    fn clear_screen(&mut self) {}
 }
 
 struct DummyInput;
@@ -40,8 +38,6 @@ impl ReadInputState for DummyInput {
 
         Ok(keys)
     }
-
-    fn reset_keys_state(&mut self) {}
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

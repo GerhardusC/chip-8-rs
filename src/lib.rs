@@ -63,17 +63,19 @@ pub trait Draw {
     /// This function will be called each time the interpreter requests to draw to the screen. The
     /// buffer you are given is just a flat list, but you are given the width and height so you can
     /// make it square yourself.
-    fn draw_buffer(&mut self, screen_buf: &[u8], screen_width: usize, screen_height: usize);
+    fn draw_buffer(&mut self, _screen_buf: &[u8], _screen_width: usize, _screen_height: usize) {}
 
     /// Clear screen will simply be called when the interpreter calls the clear screen instruction.
-    fn clear_screen(&mut self);
+    fn clear_screen(&mut self) {}
 }
 
 /// Implement this trait on a type and use it to read input state.
 pub trait ReadInputState {
     /// This function is called whenever the interpreter needs to read keyboard state. You need to
     /// give back an array of 16 characters, each mapping to the 0x0 - 0xF keys on the hex keyboard
-    fn read_keys_state(&self) -> Result<[u8; 16], String>;
+    fn read_keys_state(&self) -> Result<[u8; 16], String> {
+        Ok([0; 16])
+    }
 
     /// This is a method that most of the time doesn't need to be implemented, you can just perform
     /// a no-op, but it does give you access to when the emulator is no longer reading a key. This
@@ -81,7 +83,7 @@ pub trait ReadInputState {
     /// access to the keys state and you have to keep track of it yourself. I mean, I ran into this
     /// in the examples directory under my silly implementation for the normal terminal window, but
     /// it could just be a skill issue.
-    fn reset_keys_state(&mut self);
+    fn reset_keys_state(&mut self) {}
 }
 
 /// Currently the only ApplicationError variant is the program being too large to fit in the

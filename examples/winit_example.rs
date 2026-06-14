@@ -38,8 +38,6 @@ impl Draw for DisplayOutput {
             .buffer_sender
             .send((screen_buf.to_vec(), screen_width, screen_height));
     }
-
-    fn clear_screen(&mut self) {}
 }
 
 impl ReadInputState for KeyboardInput {
