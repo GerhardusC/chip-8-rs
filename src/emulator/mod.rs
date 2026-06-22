@@ -6,4 +6,7 @@ mod quirks;
 mod sub_commands;
 
 pub use emulator_core::*;
+pub use instructions::*;
+pub use logical_operator::*;
 pub use quirks::*;
+pub use sub_commands::*;
