@@ -592,7 +592,11 @@ impl<T: Draw, P: ReadInputState> Emulator<T, P> {
         let end_addr = start_addr + set.len();
         if end_addr > self.memory.len() {
             return Err(ApplicationError::MemoryLocationOutOfRange {
-                max_addr: self.memory.len() - set.len(),
+                max_addr: if set.len() > self.memory.len() {
+                    self.memory.len()
+                } else {
+                    self.memory.len() - set.len()
+                },
             });
         }
         let x = &mut self.memory[start_addr..end_addr];
